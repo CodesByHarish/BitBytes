@@ -1,0 +1,55 @@
+.announcement-ticker {
+    background: linear-gradient(90deg, #1f2937 0%, #111827 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    height: 40px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.ticker-label {
+    background: #6366f1;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0 1rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    letter-spacing: 0.05em;
+    z-index: 2;
+}
+
+.ticker-content {
+    flex: 1;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.ticker-text {
+    color: #e5e7eb;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fade-in {
+    animation: fadeSlide 0.5s ease-out forwards;
+}
+
+@keyframes fadeSlide {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
