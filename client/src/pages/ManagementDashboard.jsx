@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import ProfileDropdown from '../components/common/ProfileDropdown';
+import CommentSection from '../components/common/CommentSection';
 import './Dashboard.css';
 
 const ManagementDashboard = () => {
@@ -11,10 +12,16 @@ const ManagementDashboard = () => {
     const [activeTab, setActiveTab] = useState('issues');
     const [complaints, setComplaints] = useState([]);
     const [pendingUsers, setPendingUsers] = useState([]);
+    const [staff, setStaff] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
+    const [lostFoundItems, setLostFoundItems] = useState([]);
     const [newAnnouncement, setNewAnnouncement] = useState({
         text: '',
-        priority: 'medium'
+        priority: 'medium',
+        deadlineDate: '',
+        type: 'general',
+        hostel: '',
+        block: ''
     });
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState({
@@ -27,28 +34,142 @@ const ManagementDashboard = () => {
     const [actionId, setActionId] = useState(null); // ID of complaint being edited
     const [actionType, setActionType] = useState(null); // 'assign', 'status', 'priority'
     const [actionValue, setActionValue] = useState('');
+    const [actionId2, setActionId2] = useState(''); // Used for caretakerId
     const [actionComment, setActionComment] = useState('');
+    const [publicFilter, setPublicFilter] = useState(false); // For analytics tab
+    const [selectedItem, setSelectedItem] = useState(null); // { id, type }
+    const [selectedIssues, setSelectedIssues] = useState([]); // Array of IDs
+    const [showMergeModal, setShowMergeModal] = useState(false);
+
+    const [pendingRoleData, setPendingRoleData] = useState({}); // { userId: { managementRole, staffSpecialization } }
+
+    const analyticsData = useMemo(() => {
+        if (!complaints.length) return null;
+
+        const filtered = publicFilter ? complaints.filter(c => c.isPublic) : complaints;
+
+        // 1. Status Ratio
+        const total = filtered.length;
+        const resolvedCount = filtered.filter(c => c.status === 'resolved' || c.status === 'closed').length;
+        const pendingCount = total - resolvedCount;
+
+        // 2. Categories
+        const categories = filtered.reduce((acc, c) => {
+            acc[c.category] = (acc[c.category] || 0) + 1;
+            return acc;
+        }, {});
+
+        // 3. Location Density (Hostel/Block)
+        const density = filtered.reduce((acc, c) => {
+            const key = `${c.hostel} - ${c.block}`;
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+
+        // 4. Response/Resolution Times
+        let totalResponseTime = 0;
+        let totalResolutionTime = 0;
+        let respondedCount = 0;
+        let resolvedTimeCount = 0;
+
+        filtered.forEach(c => {
+            const reportedEvent = c.timeline.find(t => t.status === 'reported');
+            const assignedEvent = c.timeline.find(t => t.status === 'assigned');
+            const resolvedEvent = c.timeline.find(t => t.status === 'resolved' || t.status === 'closed');
+
+            if (reportedEvent) {
+                const startTime = new Date(reportedEvent.timestamp);
+
+                if (assignedEvent) {
+                    totalResponseTime += (new Date(assignedEvent.timestamp) - startTime);
+                    respondedCount++;
+                }
+
+                if (resolvedEvent) {
+                    totalResolutionTime += (new Date(resolvedEvent.timestamp) - startTime);
+                    resolvedTimeCount++;
+                }
+            }
+        });
+
+        const formatTime = (ms) => {
+            if (ms === 0) return 'N/A';
+            const hours = ms / (1000 * 60 * 60);
+            if (hours < 24) return `${hours.toFixed(1)}h`;
+            return `${(hours / 24).toFixed(1)}d`;
+        };
+
+        return {
+            total,
+            resolvedCount,
+            pendingCount,
+            ratio: total === 0 ? 0 : Math.round((resolvedCount / total) * 100),
+            categories: Object.entries(categories).sort((a, b) => b[1] - a[1]),
+            density: Object.entries(density).sort((a, b) => b[1] - a[1]),
+            avgResponse: respondedCount === 0 ? 'N/A' : formatTime(totalResponseTime / respondedCount),
+            avgResolution: resolvedTimeCount === 0 ? 'N/A' : formatTime(totalResolutionTime / resolvedTimeCount)
+        };
+    }, [complaints, publicFilter]);
+
+    const handleAcceptIssue = async (complaintId) => {
+        try {
+            // Assign to current user as caretaker
+            await authAPI.assignCaretaker(complaintId, user.email, user._id);
+            alert('Issue accepted! You can now track it in your assigned issues.');
+            fetchData();
+        } catch (error) {
+            console.error('Error accepting issue:', error);
+            alert('Failed to accept issue');
+        }
+    };
 
     useEffect(() => {
-        fetchData();
-    }, [activeTab]);
+        if (user) {
+            fetchData();
+        }
+    }, [activeTab, user]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            if (activeTab === 'issues') {
-                const { data } = await authAPI.getAllComplaints();
-                setComplaints(data);
-                // Calculate stats from complaints
+            // Fetch staff for any management user (used for assignment dropdowns)
+            if (user?.role === 'management') {
+                const { data } = await authAPI.getStaff();
+                setStaff(data);
+            }
+
+            if (activeTab === 'issues' || activeTab === 'resolved') {
+                const { data } = await authAPI.getAllComplaints(activeTab);
+
+                // Sort complaints: active first, resolved/closed at bottom
+                const sortedData = [...data].sort((a, b) => {
+                    const statusOrder = { 'reported': 0, 'assigned': 1, 'in-progress': 2, 'resolved': 3, 'closed': 4 };
+                    return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
+                });
+
+                setComplaints(sortedData);
+                // Calculate stats from data
                 const pending = data.filter(c => c.status !== 'resolved' && c.status !== 'closed').length;
                 const resolved = data.filter(c => c.status === 'resolved' || c.status === 'closed').length;
                 setStats(s => ({ ...s, pending, resolved }));
             } else if (activeTab === 'users' && user?.isAdmin) {
                 const { data } = await authAPI.getPendingUsers();
                 setPendingUsers(data);
+                // Initialize role data for pending users
+                const initialRoleData = {};
+                data.forEach(u => {
+                    initialRoleData[u._id] = { managementRole: 'admin', staffSpecialization: 'other' };
+                });
+                setPendingRoleData(initialRoleData);
+            } else if (activeTab === 'staff' && user?.isAdmin) {
+                const { data } = await authAPI.getStaff();
+                setStaff(data);
             } else if (activeTab === 'announcements') {
                 const { data } = await authAPI.getAnnouncements();
                 setAnnouncements(data);
+            } else if (activeTab === 'lost-found') {
+                const { data } = await authAPI.getLostFoundItems();
+                setLostFoundItems(data);
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -63,7 +184,7 @@ const ManagementDashboard = () => {
         e.preventDefault();
         try {
             await authAPI.createAnnouncement(newAnnouncement);
-            setNewAnnouncement({ text: '', priority: 'medium' });
+            setNewAnnouncement({ text: '', priority: 'medium', deadlineDate: '', type: 'general', hostel: '', block: '' });
             const { data } = await authAPI.getAnnouncements();
             setAnnouncements(data);
             alert('Announcement posted!');
@@ -87,7 +208,7 @@ const ManagementDashboard = () => {
         e.preventDefault();
         try {
             if (actionType === 'assign') {
-                await authAPI.assignCaretaker(actionId, actionValue);
+                await authAPI.assignCaretaker(actionId, actionValue, actionId2);
             } else if (actionType === 'status') {
                 await authAPI.updateComplaintStatus(actionId, actionValue, actionComment);
             } else if (actionType === 'priority') {
@@ -97,6 +218,7 @@ const ManagementDashboard = () => {
             setActionId(null);
             setActionType(null);
             setActionValue('');
+            setActionId2('');
             setActionComment('');
             fetchData(); // Refresh list
             alert('Updated successfully!');
@@ -106,13 +228,82 @@ const ManagementDashboard = () => {
         }
     };
 
-    const handleApprove = async (id) => {
+    const handleApprove = async (userId) => {
         try {
-            await authAPI.approveUser(id);
-            setPendingUsers(pendingUsers.filter(u => u._id !== id));
+            const roleData = pendingRoleData[userId] || { managementRole: 'admin', staffSpecialization: 'other' };
+            await authAPI.approveUser(userId, roleData);
+            setPendingUsers(pendingUsers.filter(u => u._id !== userId));
+            alert('User approved and role assigned!');
         } catch (error) {
             console.error('Error approving user:', error);
             alert('Failed to approve user');
+        }
+    };
+
+    const handleUpdateStaffRole = async (id, data) => {
+        try {
+            await authAPI.updateStaffRole(id, data);
+            fetchData();
+            alert('Staff role updated!');
+        } catch (error) {
+            console.error('Error updating staff role:', error);
+            alert('Failed to update staff role');
+        }
+    };
+
+    const handleModerateClaim = async (id, action) => {
+        try {
+            await authAPI.moderateClaim(id, action);
+            alert(`Claim ${action === 'approve' ? 'approved' : 'rejected'}!`);
+            fetchData();
+        } catch (error) {
+            console.error('Error moderating claim:', error);
+            alert('Failed to moderate claim');
+        }
+    };
+
+    const handleDeleteLFItem = async (id) => {
+        if (!window.confirm('Delete this item listing?')) return;
+        try {
+            await authAPI.deleteLostFoundItem(id);
+            fetchData();
+        } catch (error) {
+            console.error('Error deleting item:', error);
+            alert('Failed to delete item');
+        }
+    };
+
+    const handleUpvote = async (id, type) => {
+        try {
+            if (type === 'announcement') {
+                const { data } = await authAPI.upvoteAnnouncement(id);
+                setAnnouncements(announcements.map(a => a._id === id ? { ...a, upvotes: data.upvotes } : a));
+            } else {
+                const { data } = await authAPI.upvoteComplaint(id);
+                setComplaints(complaints.map(c => c._id === id ? { ...c, upvotes: data.upvotes } : c));
+            }
+        } catch (error) {
+            console.error('Error upvoting:', error);
+        }
+    };
+
+    const toggleIssueSelection = (id) => {
+        setSelectedIssues(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleMerge = async (primaryId) => {
+        try {
+            const duplicateIds = selectedIssues.filter(id => id !== primaryId);
+            await authAPI.mergeComplaints(primaryId, duplicateIds);
+            alert('Issues merged successfully');
+            setSelectedIssues([]);
+            setShowMergeModal(false);
+            fetchData();
+        } catch (error) {
+            console.error('Error merging:', error);
+            alert('Failed to merge issues');
         }
     };
 
@@ -128,7 +319,9 @@ const ManagementDashboard = () => {
                         </div>
                         <h1>HostelEase</h1>
                     </Link>
-                    <span className="admin-badge">Management</span>
+                    <span className="admin-badge">
+                        {user?.managementRole || 'Management'}
+                    </span>
                 </div>
                 <div className="header-right">
                     <ProfileDropdown />
@@ -139,8 +332,13 @@ const ManagementDashboard = () => {
                 <div className="welcome-card management-welcome">
                     <div className="welcome-content">
                         <h2>Management Portal 🏢</h2>
-                        <p>Overseeing hostel operations and student wellbeing.</p>
+                        {user?.managementRole === 'caretaker' ? (
+                            <p>Specialized Staff: <strong>{user.staffSpecialization}</strong></p>
+                        ) : (
+                            <p>Overseeing hostel operations and student wellbeing.</p>
+                        )}
                         {user?.isAdmin && <span className="admin-tag">Super Admin Access</span>}
+                        {user?.managementRole === 'subadmin' && <span className="admin-tag subadmin">Sub-Admin Portal</span>}
                     </div>
                 </div>
 
@@ -187,38 +385,109 @@ const ManagementDashboard = () => {
 
                 {/* Management Tabs */}
                 <div className="dashboard-tabs">
-                    <button
-                        className={`tab-btn ${activeTab === 'issues' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('issues')}
-                    >
-                        Active Issues
-                    </button>
-                    {user?.isAdmin && (
-                        <button
-                            className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('users')}
-                        >
-                            Pending Users
-                        </button>
+                    {user?.managementRole === 'caretaker' ? (
+                        <>
+                            <button
+                                className={`tab-btn ${activeTab === 'issues' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('issues')}
+                            >
+                                Available Issues
+                            </button>
+                            <button
+                                className={`tab-btn ${activeTab === 'resolved' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('resolved')}
+                            >
+                                Resolved by Me
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className={`tab-btn ${activeTab === 'issues' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('issues')}
+                            >
+                                Active Issues
+                            </button>
+                            {user?.isAdmin && (
+                                <>
+                                    <button
+                                        className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('users')}
+                                    >
+                                        Pending Users
+                                    </button>
+                                    <button
+                                        className={`tab-btn ${activeTab === 'staff' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('staff')}
+                                    >
+                                        Staff Accounts
+                                    </button>
+                                </>
+                            )}
+                            <button
+                                className={`tab-btn ${activeTab === 'announcements' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('announcements')}
+                            >
+                                Announcements
+                            </button>
+                            <button
+                                className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('analytics')}
+                            >
+                                Analytics
+                            </button>
+                            <button
+                                className={`tab-btn ${activeTab === 'lost-found' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('lost-found')}
+                            >
+                                Lost & Found
+                            </button>
+                        </>
                     )}
-                    <button
-                        className={`tab-btn ${activeTab === 'announcements' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('announcements')}
-                    >
-                        Announcements
-                    </button>
                 </div>
 
                 <div className="tab-content">
-                    {activeTab === 'issues' && (
+                    {(activeTab === 'issues' || activeTab === 'resolved') && (
                         <div className="management-issues-list">
+                            {selectedIssues.length > 0 && (
+                                <div className="bulk-actions-toolbar">
+                                    <span>{selectedIssues.length} issues selected</span>
+                                    <div className="toolbar-btns">
+                                        <button
+                                            className="merge-action-btn"
+                                            onClick={() => setShowMergeModal(true)}
+                                            disabled={selectedIssues.length < 2}
+                                        >
+                                            🔗 Merge Duplicates
+                                        </button>
+                                        <button
+                                            className="clear-selection-btn"
+                                            onClick={() => setSelectedIssues([])}
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {loading ? <p>Loading...</p> : complaints.length === 0 ? (
                                 <p className="no-pending">No complaints reported yet.</p>
                             ) : (
                                 complaints.map(complaint => (
-                                    <div key={complaint._id} className="complaint-card management-card">
+                                    <div
+                                        key={complaint._id}
+                                        className={`complaint-card management-card ${['resolved', 'closed'].includes(complaint.status) ? 'strikethrough-resolved' : ''} ${selectedIssues.includes(complaint._id) ? 'selected' : ''}`}
+                                    >
                                         <div className="card-header">
                                             <div className="header-meta">
+                                                {activeTab === 'issues' && !['resolved', 'closed', 'merged'].includes(complaint.status) && (
+                                                    <input
+                                                        type="checkbox"
+                                                        className="issue-checkbox"
+                                                        checked={selectedIssues.includes(complaint._id)}
+                                                        onChange={() => toggleIssueSelection(complaint._id)}
+                                                    />
+                                                )}
                                                 <span className={`priority-badge ${complaint.priority}`}>
                                                     {complaint.priority}
                                                 </span>
@@ -235,6 +504,30 @@ const ManagementDashboard = () => {
                                             <h3>{complaint.category}</h3>
                                             <p className="reporter">By: {complaint.student?.email}</p>
                                             <p className="description">{complaint.description}</p>
+
+                                            {complaint.isPublic && (
+                                                <div className="social-actions" style={{ marginBottom: '1rem' }}>
+                                                    <button
+                                                        className={`social-btn ${complaint.upvotes?.includes(user?._id) ? 'active' : ''}`}
+                                                        onClick={() => handleUpvote(complaint._id, 'complaint')}
+                                                    >
+                                                        👍 {complaint.upvotes?.length || 0}
+                                                    </button>
+                                                    <button
+                                                        className="social-btn"
+                                                        onClick={() => setSelectedItem(selectedItem?.id === complaint._id ? null : { id: complaint._id, type: 'Complaint' })}
+                                                    >
+                                                        💬 {selectedItem?.id === complaint._id ? 'Close Discussion' : 'Join Discussion'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {selectedItem?.id === complaint._id && (
+                                                <div className="nested-comments-area" style={{ marginBottom: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                                                    <CommentSection entityId={complaint._id} entityType="Complaint" currentUser={{ id: user?._id }} />
+                                                </div>
+                                            )}
+
                                             {complaint.caretaker && (
                                                 <div className="caretaker-info">
                                                     👷 Caretaker: <strong>{complaint.caretaker}</strong>
@@ -243,64 +536,121 @@ const ManagementDashboard = () => {
                                         </div>
 
                                         <div className="complaint-actions">
-                                            {actionId === complaint._id ? (
-                                                <form onSubmit={handleActionSubmit} className="action-inline-form">
-                                                    {actionType === 'assign' && (
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Caretaker Name"
-                                                            value={actionValue}
-                                                            onChange={(e) => setActionValue(e.target.value)}
-                                                            required
-                                                        />
-                                                    )}
-                                                    {actionType === 'status' && (
-                                                        <select
-                                                            value={actionValue}
-                                                            onChange={(e) => setActionValue(e.target.value)}
-                                                            required
-                                                        >
-                                                            <option value="">Update Status</option>
-                                                            <option value="in-progress">In Progress</option>
-                                                            <option value="resolved">Resolved</option>
-                                                            <option value="closed">Closed</option>
-                                                            <option value="reported">Re-open (Reported)</option>
-                                                        </select>
-                                                    )}
-                                                    {actionType === 'priority' && (
-                                                        <select
-                                                            value={actionValue}
-                                                            onChange={(e) => setActionValue(e.target.value)}
-                                                            required
-                                                        >
-                                                            <option value="">Update Priority</option>
-                                                            <option value="low">Low</option>
-                                                            <option value="medium">Medium</option>
-                                                            <option value="high">High</option>
-                                                            <option value="emergency">Emergency</option>
-                                                        </select>
-                                                    )}
-                                                    <textarea
-                                                        placeholder="Optional remarks..."
-                                                        value={actionComment}
-                                                        onChange={(e) => setActionComment(e.target.value)}
-                                                    />
-                                                    <div className="inline-btns">
-                                                        <button type="submit" className="save-btn">Save</button>
-                                                        <button type="button" onClick={() => setActionId(null)} className="cancel-btn">Cancel</button>
-                                                    </div>
-                                                </form>
+                                            {user?.managementRole === 'caretaker' && complaint.status === 'reported' ? (
+                                                <button
+                                                    className="action-btn accept-btn"
+                                                    onClick={() => handleAcceptIssue(complaint._id)}
+                                                >
+                                                    Accept Issue
+                                                </button>
                                             ) : (
                                                 <>
-                                                    <button onClick={() => { setActionId(complaint._id); setActionType('assign'); setActionValue(complaint.caretaker || ''); }}>
-                                                        {complaint.caretaker ? 'Reassign' : 'Assign Caretaker'}
-                                                    </button>
-                                                    <button onClick={() => { setActionId(complaint._id); setActionType('status'); setActionValue(complaint.status); }}>
-                                                        Update Status
-                                                    </button>
-                                                    <button onClick={() => { setActionId(complaint._id); setActionType('priority'); setActionValue(complaint.priority); }}>
-                                                        Change Priority
-                                                    </button>
+                                                    {actionId === complaint._id ? (
+                                                        <form onSubmit={handleActionSubmit} className="action-inline-form">
+                                                            {actionType === 'assign' && (
+                                                                <select
+                                                                    value={actionId2}
+                                                                    onChange={(e) => {
+                                                                        const selectedId = e.target.value;
+                                                                        const staffMember = staff.find(s => s._id === selectedId);
+                                                                        setActionValue(staffMember?.email || '');
+                                                                        setActionId2(selectedId);
+                                                                    }}
+                                                                    required
+                                                                >
+                                                                    <option value="">Select Caretaker</option>
+                                                                    {/* Group caretakers by specialization */}
+                                                                    <optgroup label="Recommended specialists">
+                                                                        {staff.filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() === complaint.category?.toLowerCase()).length > 0 ? (
+                                                                            staff
+                                                                                .filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() === complaint.category?.toLowerCase())
+                                                                                .map(s => (
+                                                                                    <option key={s._id} value={s._id}>
+                                                                                        {s.email} (Specialist)
+                                                                                    </option>
+                                                                                ))
+                                                                        ) : (
+                                                                            <option disabled>No exact specialists found</option>
+                                                                        )}
+                                                                    </optgroup>
+                                                                    <optgroup label="Other Staff">
+                                                                        {staff
+                                                                            .filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() !== complaint.category?.toLowerCase())
+                                                                            .map(s => (
+                                                                                <option key={s._id} value={s._id}>
+                                                                                    {s.email} ({s.staffSpecialization || 'General'})
+                                                                                </option>
+                                                                            ))}
+                                                                    </optgroup>
+                                                                    {staff.length === 0 && <option disabled>Waiting for staff list...</option>}
+                                                                </select>
+                                                            )}
+                                                            {actionType === 'status' && (
+                                                                <select
+                                                                    value={actionValue}
+                                                                    onChange={(e) => setActionValue(e.target.value)}
+                                                                    required
+                                                                >
+                                                                    <option value="">Update Status</option>
+                                                                    <option value="in-progress">In Progress</option>
+                                                                    <option value="resolved">Resolved</option>
+                                                                    <option value="closed">Closed</option>
+                                                                    <option value="reported">Re-open (Reported)</option>
+                                                                </select>
+                                                            )}
+                                                            {actionType === 'priority' && (
+                                                                <select
+                                                                    value={actionValue}
+                                                                    onChange={(e) => setActionValue(e.target.value)}
+                                                                    required
+                                                                >
+                                                                    <option value="">Update Priority</option>
+                                                                    <option value="low">Low</option>
+                                                                    <option value="medium">Medium</option>
+                                                                    <option value="high">High</option>
+                                                                    <option value="emergency">Emergency</option>
+                                                                </select>
+                                                            )}
+                                                            <textarea
+                                                                placeholder="Optional remarks..."
+                                                                value={actionComment}
+                                                                onChange={(e) => setActionComment(e.target.value)}
+                                                            />
+                                                            <div className="inline-btns">
+                                                                <button type="submit" className="save-btn">Save</button>
+                                                                <button type="button" onClick={() => setActionId(null)} className="cancel-btn">Cancel</button>
+                                                            </div>
+                                                        </form>
+                                                    ) : (
+                                                        <div className="action-btns">
+                                                            {/* Caretakers cannot re-assign or change priority */}
+                                                            {user?.managementRole !== 'caretaker' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => { setActionId(complaint._id); setActionType('assign'); }}
+                                                                        className="action-btn assign"
+                                                                        disabled={['resolved', 'closed'].includes(complaint.status)}
+                                                                    >
+                                                                        Assign
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setActionId(complaint._id); setActionType('priority'); }}
+                                                                        className="action-btn priority-btn"
+                                                                        disabled={['resolved', 'closed'].includes(complaint.status)}
+                                                                    >
+                                                                        Priority
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                onClick={() => { setActionId(complaint._id); setActionType('status'); }}
+                                                                className="action-btn status-btn"
+                                                                disabled={['resolved', 'closed'].includes(complaint.status)}
+                                                            >
+                                                                Status
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -318,14 +668,104 @@ const ManagementDashboard = () => {
                             ) : (
                                 <div className="pending-list">
                                     {pendingUsers.map(u => (
-                                        <div key={u._id} className="pending-user-card">
+                                        <div key={u._id} className="pending-user-card admin-special-card">
                                             <div className="pending-info">
                                                 <span className="pending-email">{u.email}</span>
                                                 <span className="pending-date">Registered on {new Date(u.createdAt).toLocaleDateString()}</span>
                                             </div>
-                                            <button onClick={() => handleApprove(u._id)} className="approve-btn">
-                                                Approve Account
-                                            </button>
+                                            <div className="approval-controls">
+                                                <div className="control-group">
+                                                    <label>Assign Role</label>
+                                                    <select
+                                                        value={pendingRoleData[u._id]?.managementRole || 'admin'}
+                                                        onChange={(e) => setPendingRoleData({
+                                                            ...pendingRoleData,
+                                                            [u._id]: { ...pendingRoleData[u._id], managementRole: e.target.value }
+                                                        })}
+                                                    >
+                                                        <option value="admin">Super Admin</option>
+                                                        <option value="subadmin">Sub Admin</option>
+                                                        <option value="caretaker">Caretaker</option>
+                                                    </select>
+                                                </div>
+                                                {pendingRoleData[u._id]?.managementRole === 'caretaker' && (
+                                                    <div className="control-group">
+                                                        <label>Specialization</label>
+                                                        <select
+                                                            value={pendingRoleData[u._id]?.staffSpecialization || 'other'}
+                                                            onChange={(e) => setPendingRoleData({
+                                                                ...pendingRoleData,
+                                                                [u._id]: { ...pendingRoleData[u._id], staffSpecialization: e.target.value }
+                                                            })}
+                                                        >
+                                                            <option value="plumbing">Plumbing</option>
+                                                            <option value="electrical">Electrical</option>
+                                                            <option value="cleanliness">Cleanliness</option>
+                                                            <option value="internet">Wi-Fi / Internet</option>
+                                                            <option value="furniture">Furniture</option>
+                                                            <option value="other">Other</option>
+                                                        </select>
+                                                    </div>
+                                                )}
+                                                <button onClick={() => handleApprove(u._id)} className="approve-btn">
+                                                    Approve & Assign
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'staff' && user?.isAdmin && (
+                        <div className="staff-management">
+                            <h3>Approved Management Staff</h3>
+                            {staff.length === 0 ? (
+                                <p className="no-pending">No approved staff members yet.</p>
+                            ) : (
+                                <div className="staff-list">
+                                    {staff.map(member => (
+                                        <div key={member._id} className="staff-card admin-special-card">
+                                            <div className="staff-info">
+                                                <span className="staff-email">
+                                                    {member.email} {member._id === user.id && "(You)"}
+                                                </span>
+                                                <div className="staff-role-tags">
+                                                    <span className={`role-badge ${member.managementRole}`}>
+                                                        {member.managementRole}
+                                                    </span>
+                                                    {member.staffSpecialization && (
+                                                        <span className="spec-badge">
+                                                            {member.staffSpecialization}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="staff-actions">
+                                                <select
+                                                    defaultValue={member.managementRole}
+                                                    onChange={(e) => handleUpdateStaffRole(member._id, { managementRole: e.target.value })}
+                                                    disabled={member._id === user.id}
+                                                >
+                                                    <option value="admin">Super Admin</option>
+                                                    <option value="subadmin">Sub Admin</option>
+                                                    <option value="caretaker">Caretaker</option>
+                                                </select>
+                                                {member.managementRole === 'caretaker' && (
+                                                    <select
+                                                        defaultValue={member.staffSpecialization}
+                                                        onChange={(e) => handleUpdateStaffRole(member._id, { staffSpecialization: e.target.value })}
+                                                    >
+                                                        <option value="plumbing">Plumbing</option>
+                                                        <option value="electrical">Electrical</option>
+                                                        <option value="cleanliness">Cleanliness</option>
+                                                        <option value="internet">Wi-Fi / Internet</option>
+                                                        <option value="furniture">Furniture</option>
+                                                        <option value="other">Other</option>
+                                                    </select>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -346,6 +786,15 @@ const ManagementDashboard = () => {
                                         required
                                     />
                                     <div className="form-footer">
+                                        <div className="date-input-wrapper">
+                                            <label>📅 Deadline Date</label>
+                                            <input
+                                                type="date"
+                                                value={newAnnouncement.deadlineDate}
+                                                onChange={(e) => setNewAnnouncement({ ...newAnnouncement, deadlineDate: e.target.value })}
+                                                className="date-input"
+                                            />
+                                        </div>
                                         <select
                                             value={newAnnouncement.priority}
                                             onChange={(e) => setNewAnnouncement({ ...newAnnouncement, priority: e.target.value })}
@@ -355,6 +804,48 @@ const ManagementDashboard = () => {
                                             <option value="high">High Priority</option>
                                             <option value="urgent">🚨 Urgent</option>
                                         </select>
+                                        <select
+                                            value={newAnnouncement.type}
+                                            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, type: e.target.value })}
+                                        >
+                                            <option value="general">📢 Global Announcement</option>
+                                            <option value="block">Hostel Block A</option>
+                                        </select>
+                                    </div>
+
+                                    {(newAnnouncement.type === 'hostel' || newAnnouncement.type === 'block') && (
+                                        <div className="form-footer" style={{ marginTop: '1rem' }}>
+                                            <div className="form-group">
+                                                <label>Target Hostel</label>
+                                                <select
+                                                    value={newAnnouncement.hostel}
+                                                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, hostel: e.target.value })}
+                                                    required
+                                                >
+                                                    <option value="">Select Hostel</option>
+                                                    <option value="Boys Hostel">Boys Hostel</option>
+                                                    <option value="Girls Hostel">Girls Hostel</option>
+                                                </select>
+                                            </div>
+                                            {newAnnouncement.type === 'block' && (
+                                                <div className="form-group">
+                                                    <label>Target Block</label>
+                                                    <select
+                                                        value={newAnnouncement.block}
+                                                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, block: e.target.value })}
+                                                        required
+                                                    >
+                                                        <option value="">Select Block</option>
+                                                        {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(b => (
+                                                            <option key={b} value={b}>Block {b}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="form-footer" style={{ justifyContent: 'flex-end' }}>
                                         <button type="submit" className="post-btn">Post Announcement</button>
                                     </div>
                                 </form>
@@ -367,9 +858,35 @@ const ManagementDashboard = () => {
                                 ) : (
                                     announcements.map(a => (
                                         <div key={a._id} className={`announcement-item ${a.priority}`}>
-                                            <div className="announcement-text">{a.text}</div>
+                                            <div className="announcement-content-main">
+                                                <div className="announcement-text">{a.text}</div>
+                                                {a.deadlineDate && (
+                                                    <div className="announcement-date-badge">
+                                                        <span>📅 Deadline: {new Date(a.deadlineDate).toLocaleDateString()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="social-actions" style={{ marginTop: '1rem' }}>
+                                                <button
+                                                    className={`social-btn ${a.upvotes?.includes(user?._id) ? 'active' : ''}`}
+                                                    onClick={() => handleUpvote(a._id, 'announcement')}
+                                                >
+                                                    👍 {a.upvotes?.length || 0}
+                                                </button>
+                                                <button
+                                                    className="social-btn"
+                                                    onClick={() => setSelectedItem(selectedItem?.id === a._id ? null : { id: a._id, type: 'Announcement' })}
+                                                >
+                                                    💬 Discuss
+                                                </button>
+                                            </div>
+                                            {selectedItem?.id === a._id && (
+                                                <div className="nested-comments-area" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                                                    <CommentSection entityId={a._id} entityType="Announcement" currentUser={{ id: user?._id }} />
+                                                </div>
+                                            )}
                                             <div className="announcement-meta">
-                                                <span>{new Date(a.createdAt).toLocaleDateString()}</span>
+                                                <span>Posted: {new Date(a.createdAt).toLocaleDateString()}</span>
                                                 <button onClick={() => handleDeleteAnnouncement(a._id)} className="delete-icon-btn">
                                                     🗑️
                                                 </button>
@@ -380,8 +897,191 @@ const ManagementDashboard = () => {
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'analytics' && analyticsData && (
+                        <div className="analytics-view">
+                            <div className="analytics-header">
+                                <h3>Operational Analytics</h3>
+                                <button
+                                    className={`filter-toggle ${publicFilter ? 'active' : ''}`}
+                                    onClick={() => setPublicFilter(!publicFilter)}
+                                >
+                                    {publicFilter ? 'Showing: Public Only' : 'Showing: All Issues'}
+                                </button>
+                            </div>
+
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="stat-value">{analyticsData.avgResponse}</div>
+                                    <div className="stat-label">Avg. Response Time</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{analyticsData.avgResolution}</div>
+                                    <div className="stat-label">Avg. Resolution Time</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{analyticsData.ratio}%</div>
+                                    <div className="stat-label">Resolution Rate</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{analyticsData.total}</div>
+                                    <div className="stat-label">Total Reports</div>
+                                </div>
+                            </div>
+
+                            <div className="analytics-charts">
+                                <div className="chart-container">
+                                    <h4>Most Frequent Categories</h4>
+                                    <div className="bar-chart">
+                                        {analyticsData.categories.map(([category, count]) => (
+                                            <div key={category} className="bar-item">
+                                                <div className="bar-info">
+                                                    <span className="bar-label">{category}</span>
+                                                    <span className="bar-count">{count}</span>
+                                                </div>
+                                                <div className="bar-bg">
+                                                    <div
+                                                        className="bar-fill"
+                                                        style={{ width: `${(count / analyticsData.total) * 100}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="chart-container">
+                                    <h4>Hostel/Block Density</h4>
+                                    <div className="density-list">
+                                        {analyticsData.density.map(([location, count]) => (
+                                            <div key={location} className="density-item">
+                                                <span className="density-label">{location}</span>
+                                                <span className={`density-badge ${count > 5 ? 'high' : count > 2 ? 'medium' : 'low'}`}>
+                                                    {count} issues
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'lost-found' && (
+                        <div className="lost-found-management">
+                            <h3>Manage Lost & Found</h3>
+                            {lostFoundItems.length === 0 ? (
+                                <p className="no-pending">No items reported yet.</p>
+                            ) : (
+                                <div className="complaints-list">
+                                    {lostFoundItems.map(item => (
+                                        <div key={item._id} className={`complaint-card ${item.status === 'claimed' ? 'urgent' : ''}`}>
+                                            <div className="card-header">
+                                                <span className={`priority-badge ${item.type === 'found' ? 'low' : 'high'}`}>
+                                                    {item.type.toUpperCase()}
+                                                </span>
+                                                <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : '#fbbf24' }}>
+                                                    {item.status.toUpperCase()}
+                                                </span>
+                                            </div>
+
+                                            {item.media && item.media.length > 0 && (
+                                                <div className="item-card-image">
+                                                    <img src={item.media[0]} alt={item.title} />
+                                                </div>
+                                            )}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                <div>
+                                                    <h3 style={{ margin: '0.5rem 0' }}>{item.title}</h3>
+                                                    <p className="description-preview">{item.description}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleDeleteLFItem(item._id)}
+                                                    className="delete-announcement-btn"
+                                                    title="Delete Listing"
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                                                📍 {item.location} • 📅 {new Date(item.date).toLocaleDateString()}<br />
+                                                👤 Reported by: {item.reportedBy?.email}
+                                            </div>
+
+                                            {item.status === 'claimed' && (
+                                                <div className="moderation-panel" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(251, 191, 36, 0.05)', borderRadius: '8px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+                                                    <h4 style={{ color: '#fbbf24', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                                        🔍 Pending Claim Review
+                                                    </h4>
+                                                    <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>
+                                                        <strong>Claimant:</strong> {item.claimant?.email}<br />
+                                                        <strong>Proof/Message:</strong> {item.claimMessage}
+                                                    </p>
+                                                    <div className="inline-btns">
+                                                        <button
+                                                            onClick={() => handleModerateClaim(item._id, 'approve')}
+                                                            className="approve-btn"
+                                                        >
+                                                            Approve Claim
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleModerateClaim(item._id, 'reject')}
+                                                            className="cancel-btn"
+                                                        >
+                                                            Reject Claim
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </main>
+
+            {showMergeModal && (
+                <div className="modal-overlay">
+                    <div className="merge-modal-container">
+                        <h3>Select Primary Issue</h3>
+                        <p>All other selected issues will be merged into this one. The primary issue will be the one caretakers work on.</p>
+
+                        <div className="selected-issues-preview">
+                            {complaints
+                                .filter(c => selectedIssues.includes(c._id))
+                                .map(c => (
+                                    <div
+                                        key={c._id}
+                                        className="merge-option-card"
+                                        onClick={() => handleMerge(c._id)}
+                                    >
+                                        <div className="option-header">
+                                            <span className={`priority-badge ${c.priority}`}>{c.category}</span>
+                                            <span className="reporter-email">{c.student?.email}</span>
+                                        </div>
+                                        <p className="option-desc">{c.description}</p>
+                                        <div className="select-hint">Click to make Primary →</div>
+                                    </div>
+                                ))
+                            }
+                        </div>
+
+                        <div className="modal-footer">
+                            <button
+                                className="cancel-btn"
+                                onClick={() => setShowMergeModal(false)}
+                            >
+                                Cancel Merge
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

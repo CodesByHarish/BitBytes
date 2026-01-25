@@ -43,6 +43,16 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    managementRole: {
+        type: String,
+        enum: ['admin', 'subadmin', 'caretaker'],
+        default: 'admin'
+    },
+    staffSpecialization: {
+        type: String,
+        enum: ['plumbing', 'electrical', 'cleanliness', 'internet', 'furniture', 'other'],
+        default: null
+    },
     refreshToken: {
         type: String,
         default: null

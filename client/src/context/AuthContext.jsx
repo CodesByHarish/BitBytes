@@ -16,14 +16,24 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check if user is logged in on mount
-        const storedUser = localStorage.getItem('user');
-        const token = localStorage.getItem('accessToken');
+        const checkMe = async () => {
+            const token = localStorage.getItem('accessToken');
+            if (token) {
+                try {
+                    const { data } = await authAPI.getMe();
+                    setUser(data);
+                    localStorage.setItem('user', JSON.stringify(data));
+                } catch (error) {
+                    console.error('Session verify failed:', error);
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('accessToken');
+                    setUser(null);
+                }
+            }
+            setLoading(false);
+        };
 
-        if (storedUser && token) {
-            setUser(JSON.parse(storedUser));
-        }
-        setLoading(false);
+        checkMe();
     }, []);
 
     const loginStudent = async (email, password) => {

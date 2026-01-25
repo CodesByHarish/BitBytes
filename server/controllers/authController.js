@@ -179,6 +179,12 @@ const loginManagement = async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
+        console.log('Sending user data on login:', {
+            email: user.email,
+            managementRole: user.managementRole,
+            isAdmin: user.isAdmin
+        });
+
         res.json({
             message: 'Login successful',
             user: {
@@ -186,7 +192,9 @@ const loginManagement = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 isApproved: user.isApproved,
-                isAdmin: user.isAdmin
+                isAdmin: user.isAdmin,
+                managementRole: user.managementRole,
+                staffSpecialization: user.staffSpecialization
             },
             accessToken
         });

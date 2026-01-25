@@ -43,11 +43,26 @@ const complaintSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['reported', 'assigned', 'in-progress', 'resolved', 'closed'],
+        enum: ['reported', 'assigned', 'in-progress', 'resolved', 'closed', 'merged'],
         default: 'reported'
     },
+    // Merging Support
+    mergedInto: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Complaint',
+        default: null
+    },
+    mergedIssues: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Complaint'
+    }],
     caretaker: {
         type: String,
+        default: null
+    },
+    caretakerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         default: null
     },
     timeline: [{
@@ -64,6 +79,10 @@ const complaintSchema = new mongoose.Schema({
             ref: 'User'
         },
         comment: String
+    }],
+    upvotes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }]
 }, {
     timestamps: true

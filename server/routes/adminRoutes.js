@@ -26,7 +26,7 @@ router.get('/pending', protect, authorize('management'), async (req, res) => {
     }
 });
 
-// @desc    Approve a management user
+// @desc    Approve a management user with role assignment
 // @route   PUT /api/admin/approve/:id
 router.put('/approve/:id', protect, authorize('management'), async (req, res) => {
     try {
@@ -34,6 +34,7 @@ router.put('/approve/:id', protect, authorize('management'), async (req, res) =>
             return res.status(403).json({ message: 'Access denied. Admin only.' });
         }
 
+        const { managementRole, staffSpecialization } = req.body;
         const user = await User.findById(req.params.id);
 
         if (!user) {
@@ -41,9 +42,54 @@ router.put('/approve/:id', protect, authorize('management'), async (req, res) =>
         }
 
         user.isApproved = true;
+        if (managementRole) user.managementRole = managementRole;
+        if (staffSpecialization) user.staffSpecialization = staffSpecialization;
+
         await user.save();
 
         res.json({ message: 'User approved successfully', user });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Get all approved management staff
+// @route   GET /api/admin/staff
+router.get('/staff', protect, authorize('management'), async (req, res) => {
+    try {
+        // Any approved management user can view staff list now
+        const staff = await User.find({
+            role: 'management',
+            isApproved: true
+        }).select('-password');
+
+        res.json(staff);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Update staff role and specialization
+// @route   PUT /api/admin/staff/:id/role
+router.put('/staff/:id/role', protect, authorize('management'), async (req, res) => {
+    try {
+        if (!req.user.isAdmin) {
+            return res.status(403).json({ message: 'Access denied. Admin only.' });
+        }
+
+        const { managementRole, staffSpecialization } = req.body;
+        const user = await User.findById(req.params.id);
+
+        if (!user || user.role !== 'management') {
+            return res.status(404).json({ message: 'Staff member not found' });
+        }
+
+        if (managementRole) user.managementRole = managementRole;
+        // Specialization is only relevant for caretakers, but we can store it for others too
+        user.staffSpecialization = staffSpecialization || null;
+
+        await user.save();
+        res.json({ message: 'Staff role updated', user });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -26,6 +26,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/announcements', require('./routes/announcementRoutes'));
+app.use('/api/lost-found', require('./routes/lostFoundRoutes'));
+app.use('/api/comments', require('./routes/commentRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -47,7 +47,12 @@ const ProfileDropdown = () => {
                     <div className="dropdown-header">
                         <span className="user-email">{user?.email}</span>
                         <span className="user-role-badge">
-                            {user?.isAdmin ? 'Admin' : (user?.role === 'management' ? 'Management' : 'Student')}
+                            {user?.role === 'management' ? (
+                                <>
+                                    {user?.managementRole || 'Management'}
+                                    {user?.staffSpecialization && ` (${user.staffSpecialization})`}
+                                </>
+                            ) : 'Student'}
                         </span>
                     </div>
 

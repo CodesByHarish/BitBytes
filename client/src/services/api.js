@@ -61,21 +61,38 @@ export const authAPI = {
     refreshToken: () => api.post('/auth/refresh-token'),
     // Admin endpoints
     getPendingUsers: () => api.get('/admin/pending'),
-    approveUser: (id) => api.put(`/admin/approve/${id}`),
+    approveUser: (id, data) => api.put(`/admin/approve/${id}`, data),
+    getStaff: () => api.get('/admin/staff'),
+    updateStaffRole: (id, data) => api.put(`/admin/staff/${id}/role`, data),
 
     // Complaint endpoints
     createComplaint: (data) => api.post('/complaints', data),
     getMyComplaints: () => api.get('/complaints/my'),
     getPublicComplaints: () => api.get('/complaints/public'),
-    getAllComplaints: () => api.get('/complaints'),
-    assignCaretaker: (id, caretaker) => api.put(`/complaints/${id}/assign`, { caretaker }),
+    getAllComplaints: (tab) => api.get('/complaints', { params: { tab } }),
+    assignCaretaker: (id, caretaker, caretakerId) => api.put(`/complaints/${id}/assign`, { caretaker, caretakerId }),
     updateComplaintStatus: (id, status, comment) => api.put(`/complaints/${id}/status`, { status, comment }),
     updateComplaintPriority: (id, priority, comment) => api.put(`/complaints/${id}/priority`, { priority, comment }),
+    mergeComplaints: (primaryId, duplicateIds) => api.post('/complaints/merge', { primaryId, duplicateIds }),
 
     // Announcement endpoints
     getAnnouncements: () => api.get('/announcements'),
     createAnnouncement: (data) => api.post('/announcements', data),
-    deleteAnnouncement: (id) => api.delete(`/announcements/${id}`)
+    deleteAnnouncement: (id) => api.delete(`/announcements/${id}`),
+
+    // Lost & Found endpoints
+    getLostFoundItems: () => api.get('/lost-found'),
+    reportLostFoundItem: (data) => api.post('/lost-found', data),
+    claimItem: (id, claimMessage) => api.put(`/lost-found/${id}/claim`, { claimMessage }),
+    moderateClaim: (id, action) => api.put(`/lost-found/${id}/moderate`, { action }),
+    deleteLostFoundItem: (id) => api.delete(`/lost-found/${id}`),
+
+    // Social & Comment endpoints
+    upvoteComplaint: (id) => api.post(`/complaints/${id}/upvote`),
+    upvoteAnnouncement: (id) => api.post(`/announcements/${id}/upvote`),
+    getComments: (type, id) => api.get(`/comments/${type}/${id}`),
+    addComment: (data) => api.post('/comments', data),
+    reactToComment: (id, emoji = '❤️') => api.post(`/comments/${id}/react`, { emoji })
 };
 
 export default api;

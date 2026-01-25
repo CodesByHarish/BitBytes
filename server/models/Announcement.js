@@ -16,10 +16,31 @@ const announcementSchema = new mongoose.Schema({
         enum: ['low', 'medium', 'high', 'urgent'],
         default: 'medium'
     },
+    type: {
+        type: String,
+        enum: ['general', 'hostel', 'block'],
+        default: 'general'
+    },
+    hostel: {
+        type: String,
+        default: null
+    },
+    block: {
+        type: String,
+        default: null
+    },
     expiresAt: {
         type: Date,
         default: null // null means never expires
-    }
+    },
+    deadlineDate: {
+        type: Date,
+        default: null
+    },
+    upvotes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }]
 }, {
     timestamps: true
 });

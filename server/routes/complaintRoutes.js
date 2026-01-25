@@ -71,14 +71,34 @@ router.get('/public', protect, async (req, res) => {
 // @route   GET /api/complaints
 router.get('/', protect, authorize('management'), async (req, res) => {
     try {
-        const count = await Complaint.countDocuments();
-        console.log(`GET /api/complaints - Total in DB: ${count}`);
+        const { tab } = req.query;
+        const query = {};
 
-        const complaints = await Complaint.find({})
+        // If user is a caretaker, implement tab-based filtering
+        if (req.user.managementRole === 'caretaker') {
+            if (tab === 'resolved') {
+                // Issues resolved by this specific caretaker
+                query.caretakerId = req.user.id;
+                query.status = 'resolved';
+            } else {
+                // Issues available: Reported issues in their specialization OR issues already assigned to them but not resolved
+                query.$or = [
+                    {
+                        status: 'reported',
+                        category: req.user.staffSpecialization
+                    },
+                    {
+                        caretakerId: req.user.id,
+                        status: { $ne: 'resolved' }
+                    }
+                ];
+            }
+        }
+
+        const complaints = await Complaint.find(query)
             .populate('student', 'email roomNumber block hostel')
             .sort({ createdAt: -1 });
 
-        console.log(`Returning ${complaints.length} complaints to management`);
         res.json(complaints);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -89,20 +109,22 @@ router.get('/', protect, authorize('management'), async (req, res) => {
 // @route   PUT /api/complaints/:id/assign
 router.put('/:id/assign', protect, authorize('management'), async (req, res) => {
     try {
-        const { caretaker } = req.body;
+        const { caretaker, caretakerId } = req.body;
         const complaint = await Complaint.findById(req.params.id);
 
         if (!complaint) {
             return res.status(404).json({ message: 'Complaint not found' });
         }
 
-        complaint.caretaker = caretaker;
+        if (caretaker) complaint.caretaker = caretaker;
+        if (caretakerId) complaint.caretakerId = caretakerId;
+
         complaint.status = 'assigned';
         complaint.timeline.push({
             status: 'assigned',
             timestamp: new Date(),
             updatedBy: req.user.id,
-            comment: `Assigned to caretaker: ${caretaker}`
+            comment: `Assigned to caretaker: ${caretaker || 'Staff'}`
         });
 
         await complaint.save();
@@ -132,7 +154,72 @@ router.put('/:id/status', protect, authorize('management'), async (req, res) => 
         });
 
         await complaint.save();
+
+        // Cascade resolution to merged issues
+        if (['resolved', 'closed'].includes(status) && complaint.mergedIssues && complaint.mergedIssues.length > 0) {
+            await Complaint.updateMany(
+                { _id: { $in: complaint.mergedIssues } },
+                {
+                    status,
+                    $push: {
+                        timeline: {
+                            status,
+                            timestamp: new Date(),
+                            updatedBy: req.user.id,
+                            comment: `Auto-resolved via merge with primary issue: ${complaint._id}`
+                        }
+                    }
+                }
+            );
+        }
+
         res.json(complaint);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Merge similar/duplicate complaints
+// @route   POST /api/complaints/merge
+router.post('/merge', protect, authorize('management'), async (req, res) => {
+    try {
+        const { primaryId, duplicateIds } = req.body;
+
+        if (!primaryId || !duplicateIds || !duplicateIds.length) {
+            return res.status(400).json({ message: 'Primary ID and at least one duplicate ID are required' });
+        }
+
+        const primary = await Complaint.findById(primaryId);
+        if (!primary) return res.status(404).json({ message: 'Primary complaint not found' });
+
+        // Update duplicates
+        await Complaint.updateMany(
+            { _id: { $in: duplicateIds } },
+            {
+                status: 'merged',
+                mergedInto: primaryId,
+                $push: {
+                    timeline: {
+                        status: 'merged',
+                        timestamp: new Date(),
+                        updatedBy: req.user.id,
+                        comment: `Issue merged into primary report: ${primary.description?.substring(0, 50)}...`
+                    }
+                }
+            }
+        );
+
+        // Update primary
+        primary.mergedIssues = [...(primary.mergedIssues || []), ...duplicateIds];
+        primary.timeline.push({
+            status: primary.status,
+            timestamp: new Date(),
+            updatedBy: req.user.id,
+            comment: `Merged ${duplicateIds.length} duplicate report(s) into this issue`
+        });
+
+        await primary.save();
+        res.json(primary);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -160,6 +247,27 @@ router.put('/:id/priority', protect, authorize('management'), async (req, res) =
 
         await complaint.save();
         res.json(complaint);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Toggle upvote on a complaint
+// @route   POST /api/complaints/:id/upvote
+router.post('/:id/upvote', protect, async (req, res) => {
+    try {
+        const complaint = await Complaint.findById(req.params.id);
+        if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+
+        const index = complaint.upvotes.indexOf(req.user._id);
+        if (index === -1) {
+            complaint.upvotes.push(req.user._id);
+        } else {
+            complaint.upvotes.splice(index, 1);
+        }
+
+        await complaint.save();
+        res.json({ upvotes: complaint.upvotes });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

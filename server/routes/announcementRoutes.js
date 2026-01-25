@@ -3,16 +3,41 @@ const router = express.Router();
 const Announcement = require('../models/Announcement');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// @desc    Get all active announcements
-// @route   GET /api/announcements
 router.get('/', protect, async (req, res) => {
     try {
-        const announcements = await Announcement.find({
+        const query = {
             $or: [
                 { expiresAt: null },
                 { expiresAt: { $gt: new Date() } }
             ]
-        }).sort({ createdAt: -1 });
+        };
+
+        // If user is a student, only show general or their specific hostel/block news
+        if (req.user.role === 'student') {
+            query.$and = [
+                {
+                    $or: [
+                        { type: 'general' },
+                        { type: { $exists: false } },
+                        {
+                            $and: [
+                                { type: 'hostel' },
+                                { hostel: req.user.hostel }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { type: 'block' },
+                                { hostel: req.user.hostel },
+                                { block: req.user.block }
+                            ]
+                        }
+                    ]
+                }
+            ];
+        }
+
+        const announcements = await Announcement.find(query).sort({ createdAt: -1 });
         res.json(announcements);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -23,11 +48,25 @@ router.get('/', protect, async (req, res) => {
 // @route   POST /api/announcements
 router.post('/', protect, authorize('management'), async (req, res) => {
     try {
-        const { text, priority, expiresAt } = req.body;
+        const { text, priority, expiresAt, deadlineDate, type } = req.body;
+
+        let hostel = req.body.hostel || null;
+        let block = req.body.block || null;
+
+        // Fallback to admin's own hostel/block if none provided but type is specific
+        if (['hostel', 'block'].includes(type) && !hostel && req.user.role === 'management') {
+            hostel = req.user.hostel || null;
+            block = req.user.block || null;
+        }
+
         const announcement = await Announcement.create({
             text,
             priority,
             expiresAt,
+            deadlineDate,
+            type: type || 'general',
+            hostel,
+            block,
             createdBy: req.user.id
         });
         res.status(201).json(announcement);
@@ -42,6 +81,27 @@ router.delete('/:id', protect, authorize('management'), async (req, res) => {
     try {
         await Announcement.findByIdAndDelete(req.params.id);
         res.json({ message: 'Announcement deleted' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Toggle upvote on an announcement
+// @route   POST /api/announcements/:id/upvote
+router.post('/:id/upvote', protect, async (req, res) => {
+    try {
+        const announcement = await Announcement.findById(req.params.id);
+        if (!announcement) return res.status(404).json({ message: 'Announcement not found' });
+
+        const index = announcement.upvotes.indexOf(req.user._id);
+        if (index === -1) {
+            announcement.upvotes.push(req.user._id);
+        } else {
+            announcement.upvotes.splice(index, 1);
+        }
+
+        await announcement.save();
+        res.json({ upvotes: announcement.upvotes });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
