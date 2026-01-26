@@ -187,7 +187,7 @@ const StudentDashboard = () => {
                     </svg>
                 </div>
                 <h3>Announcements</h3>
-                <p>View global hostel announcements</p>
+                <p>Global & relevant updates</p>
                 {announcements.filter(a => a.type === 'general' || !a.type).length > 0 && (
                     <span className="nav-box-badge">
                         {announcements.filter(a => a.type === 'general' || !a.type).length}
@@ -222,9 +222,9 @@ const StudentDashboard = () => {
                 </div>
                 <h3>Hostel Block News</h3>
                 <p>Specific news for Block {user?.block}</p>
-                {announcements.filter(a => a.type === 'block').length > 0 && (
+                {announcements.filter(a => a.type === 'block' && (a.targetBlocks?.includes(user?.block) || a.block === user?.block)).length > 0 && (
                     <span className="nav-box-badge">
-                        {announcements.filter(a => a.type === 'block').length}
+                        {announcements.filter(a => a.type === 'block' && (a.targetBlocks?.includes(user?.block) || a.block === user?.block)).length}
                     </span>
                 )}
             </div>
@@ -294,19 +294,36 @@ const StudentDashboard = () => {
                 <h2>📢 Announcements</h2>
             </div>
             <div className="detail-content">
-                {loading ? <p>Loading...</p> : announcements.filter(a => a.type === 'general' || !a.type).length === 0 ? (
+                {loading ? <p>Loading...</p> : announcements.length === 0 ? (
                     <div className="empty-state">
-                        <p>No active general announcements.</p>
+                        <p>No active announcements.</p>
                     </div>
                 ) : (
                     <div className="active-announcements-list">
-                        {announcements.filter(a => a.type === 'general' || !a.type).map(a => (
+                        {announcements.map(a => (
                             <div key={a._id} className={`announcement-item ${a.priority}`}>
                                 <div className="announcement-content-main">
+                                    <div className="announcement-header-meta" style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                        <span className="category-meta-badge" style={{ padding: '0.2rem 0.6rem', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase' }}>
+                                            {a.category === 'fees' ? '💰 Fees' :
+                                                a.category === 'cleaning' ? '🧹 Cleaning' :
+                                                    a.category === 'pest-control' ? '🕷️ Pest' :
+                                                        a.category === 'utility-downtime' ? '⚡ Utility' :
+                                                            a.category === 'maintenance' ? '🔧 Maint' : '📢 General'}
+                                        </span>
+                                        {a.type !== 'general' && (
+                                            <span className="target-meta-badge" style={{ padding: '0.2rem 0.6rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.7rem', color: '#9ca3af' }}>
+                                                {a.type === 'block' ? `Block ${a.targetBlocks?.join(', ')}` : `Roles: ${a.targetRoles?.join(', ')}`}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="announcement-text">{a.text}</div>
                                     {a.deadlineDate && (
                                         <div className="announcement-date-badge">
-                                            📅 Deadline: {new Date(a.deadlineDate).toLocaleDateString()}
+                                            <span>
+                                                {['fees', 'general'].includes(a.category) ? '📅 Deadline: ' : '📅 Date: '}
+                                                {new Date(a.deadlineDate).toLocaleDateString()}
+                                            </span>
                                         </div>
                                     )}
                                 </div>
@@ -494,20 +511,32 @@ const StudentDashboard = () => {
                 <h2>🎯 Hostel Block News</h2>
             </div>
             <div className="detail-content">
-                {loading ? <p>Loading...</p> : announcements.filter(a => a.type === 'block').length === 0 ? (
+                {loading ? <p>Loading...</p> : announcements.filter(a => a.type === 'block' && (a.targetBlocks?.includes(user?.block) || a.block === user?.block)).length === 0 ? (
                     <div className="empty-state">
                         <div className="coming-soon-icon">🎯</div>
                         <p>No specific news for Block {user?.block} yet. Stay tuned!</p>
                     </div>
                 ) : (
                     <div className="active-announcements-list">
-                        {announcements.filter(a => a.type === 'block').map(a => (
+                        {announcements.filter(a => a.type === 'block' && (a.targetBlocks?.includes(user?.block) || a.block === user?.block)).map(a => (
                             <div key={a._id} className={`announcement-item ${a.priority}`}>
                                 <div className="announcement-content-main">
+                                    <div className="announcement-header-meta" style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                        <span className="category-meta-badge" style={{ padding: '0.2rem 0.6rem', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase' }}>
+                                            {a.category === 'fees' ? '💰 Fees' :
+                                                a.category === 'cleaning' ? '🧹 Cleaning' :
+                                                    a.category === 'pest-control' ? '🕷️ Pest' :
+                                                        a.category === 'utility-downtime' ? '⚡ Utility' :
+                                                            a.category === 'maintenance' ? '🔧 Maint' : '📢 General'}
+                                        </span>
+                                    </div>
                                     <div className="announcement-text">{a.text}</div>
                                     {a.deadlineDate && (
                                         <div className="announcement-date-badge">
-                                            📅 Deadline: {new Date(a.deadlineDate).toLocaleDateString()}
+                                            <span>
+                                                {['fees', 'general'].includes(a.category) ? '📅 Deadline: ' : '📅 Date: '}
+                                                {new Date(a.deadlineDate).toLocaleDateString()}
+                                            </span>
                                         </div>
                                     )}
                                 </div>

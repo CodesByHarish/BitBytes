@@ -16,11 +16,24 @@ const announcementSchema = new mongoose.Schema({
         enum: ['low', 'medium', 'high', 'urgent'],
         default: 'medium'
     },
-    type: {
+    category: {
         type: String,
-        enum: ['general', 'hostel', 'block'],
+        enum: ['fees', 'cleaning', 'pest-control', 'utility-downtime', 'maintenance', 'general'],
         default: 'general'
     },
+    type: {
+        type: String,
+        enum: ['general', 'hostel', 'block', 'role'],
+        default: 'general'
+    },
+    targetBlocks: [{
+        type: String,
+        enum: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    }],
+    targetRoles: [{
+        type: String,
+        enum: ['student', 'subadmin', 'caretaker']
+    }],
     hostel: {
         type: String,
         default: null

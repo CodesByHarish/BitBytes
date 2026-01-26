@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { authAPI } from '../../services/api';
+import './CommentSection.css';
 
 const CommentSection = ({ entityId, entityType, currentUser }) => {
     const [comments, setComments] = useState([]);
@@ -82,13 +83,19 @@ const CommentSection = ({ entityId, entityType, currentUser }) => {
                                         {c.author?.email}
                                     </span>
                                     <div className="author-badges">
-                                        {c.author?.managementRole && (
-                                            <span className="badge management-badge">
-                                                [{c.author.managementRole.toUpperCase()}]
-                                            </span>
+                                        {c.author?.role === 'student' && (
+                                            <span className="badge student-badge">[STUDENT]</span>
                                         )}
-                                        {c.author?.isAdmin && c.author?.managementRole?.toLowerCase() !== 'admin' && (
-                                            <span className="badge admin-badge">[ADMIN]</span>
+                                        {c.author?.role === 'management' && (
+                                            <>
+                                                {c.author?.isAdmin ? (
+                                                    <span className="badge superadmin-badge">[SUPERADMIN]</span>
+                                                ) : (
+                                                    <span className={`badge ${c.author?.managementRole === 'subadmin' ? 'subadmin-badge' : 'management-badge'}`}>
+                                                        [{c.author?.managementRole?.toUpperCase() || 'STAFF'}]
+                                                    </span>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 </div>

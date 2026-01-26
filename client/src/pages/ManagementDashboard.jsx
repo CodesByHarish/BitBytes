@@ -18,10 +18,11 @@ const ManagementDashboard = () => {
     const [newAnnouncement, setNewAnnouncement] = useState({
         text: '',
         priority: 'medium',
+        category: 'general',
         deadlineDate: '',
         type: 'general',
-        hostel: '',
-        block: ''
+        targetBlocks: [],
+        targetRoles: []
     });
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState({
@@ -183,8 +184,25 @@ const ManagementDashboard = () => {
     const handleAnnouncementSubmit = async (e) => {
         e.preventDefault();
         try {
-            await authAPI.createAnnouncement(newAnnouncement);
-            setNewAnnouncement({ text: '', priority: 'medium', deadlineDate: '', type: 'general', hostel: '', block: '' });
+            console.log('Posting Announcement - State:', newAnnouncement);
+            await authAPI.createAnnouncement({
+                text: newAnnouncement.text,
+                priority: newAnnouncement.priority,
+                category: newAnnouncement.category,
+                deadlineDate: newAnnouncement.deadlineDate,
+                type: newAnnouncement.type,
+                targetBlocks: newAnnouncement.targetBlocks,
+                targetRoles: newAnnouncement.targetRoles
+            });
+            setNewAnnouncement({
+                text: '',
+                priority: 'medium',
+                category: 'general',
+                deadlineDate: '',
+                type: 'general',
+                targetBlocks: [],
+                targetRoles: []
+            });
             const { data } = await authAPI.getAnnouncements();
             setAnnouncements(data);
             alert('Announcement posted!');
@@ -787,7 +805,9 @@ const ManagementDashboard = () => {
                                     />
                                     <div className="form-footer">
                                         <div className="date-input-wrapper">
-                                            <label>📅 Deadline Date</label>
+                                            <label>
+                                                {['fees', 'general'].includes(newAnnouncement.category) ? '📅 Deadline Date' : '📅 Notice/Event Date'}
+                                            </label>
                                             <input
                                                 type="date"
                                                 value={newAnnouncement.deadlineDate}
@@ -798,55 +818,111 @@ const ManagementDashboard = () => {
                                         <select
                                             value={newAnnouncement.priority}
                                             onChange={(e) => setNewAnnouncement({ ...newAnnouncement, priority: e.target.value })}
+                                            className="priority-select"
                                         >
                                             <option value="low">Low Priority</option>
                                             <option value="medium">Medium Priority</option>
                                             <option value="high">High Priority</option>
-                                            <option value="urgent">🚨 Urgent</option>
+                                            <option value="urgent">Urgent Priority</option>
                                         </select>
+
+                                        <select
+                                            value={newAnnouncement.category}
+                                            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, category: e.target.value })}
+                                            className="type-select"
+                                        >
+                                            <option value="general">General Category</option>
+                                            <option value="fees">Hostel Fees</option>
+                                            <option value="cleaning">Cleaning Schedules</option>
+                                            <option value="pest-control">Pest Control Drive</option>
+                                            <option value="utility-downtime">Water/Power Downtime</option>
+                                            <option value="maintenance">Maintenance Notice</option>
+                                        </select>
+
                                         <select
                                             value={newAnnouncement.type}
                                             onChange={(e) => setNewAnnouncement({ ...newAnnouncement, type: e.target.value })}
+                                            className="type-select"
                                         >
                                             <option value="general">📢 Global Announcement</option>
-                                            <option value="block">Hostel Block A</option>
+                                            <option value="block">🏗️ Target by Block</option>
+                                            <option value="role">👥 Target by Role</option>
                                         </select>
                                     </div>
 
-                                    {(newAnnouncement.type === 'hostel' || newAnnouncement.type === 'block') && (
-                                        <div className="form-footer" style={{ marginTop: '1rem' }}>
-                                            <div className="form-group">
-                                                <label>Target Hostel</label>
-                                                <select
-                                                    value={newAnnouncement.hostel}
-                                                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, hostel: e.target.value })}
-                                                    required
-                                                >
-                                                    <option value="">Select Hostel</option>
-                                                    <option value="Boys Hostel">Boys Hostel</option>
-                                                    <option value="Girls Hostel">Girls Hostel</option>
-                                                </select>
+                                    {/* Conditional targeting inputs */}
+                                    {newAnnouncement.type === 'block' && (
+                                        <div className="targeting-options-container">
+                                            <label>Select Blocks (A-H)</label>
+                                            <div className="targeting-checkbox-grid">
+                                                {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(block => (
+                                                    <label key={block} className="targeting-checkbox-item">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={newAnnouncement.targetBlocks.includes(block)}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setNewAnnouncement(prev => ({
+                                                                    ...prev,
+                                                                    targetBlocks: checked
+                                                                        ? [...prev.targetBlocks, block]
+                                                                        : prev.targetBlocks.filter(b => b !== block)
+                                                                }));
+                                                            }}
+                                                        />
+                                                        {block}
+                                                    </label>
+                                                ))}
                                             </div>
-                                            {newAnnouncement.type === 'block' && (
-                                                <div className="form-group">
-                                                    <label>Target Block</label>
-                                                    <select
-                                                        value={newAnnouncement.block}
-                                                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, block: e.target.value })}
-                                                        required
-                                                    >
-                                                        <option value="">Select Block</option>
-                                                        {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(b => (
-                                                            <option key={b} value={b}>Block {b}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            )}
                                         </div>
                                     )}
 
-                                    <div className="form-footer" style={{ justifyContent: 'flex-end' }}>
-                                        <button type="submit" className="post-btn">Post Announcement</button>
+                                    {newAnnouncement.type === 'role' && (
+                                        <div className="targeting-options-container">
+                                            <label>Select Target Roles</label>
+                                            <div className="targeting-checkbox-grid">
+                                                {[
+                                                    { id: 'subadmin', label: 'Sub-Admin' },
+                                                    { id: 'caretaker', label: 'Caretaker' }
+                                                ].map(role => (
+                                                    <label key={role.id} className="targeting-checkbox-item">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={newAnnouncement.targetRoles.includes(role.id)}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setNewAnnouncement(prev => ({
+                                                                    ...prev,
+                                                                    targetRoles: checked
+                                                                        ? [...prev.targetRoles, role.id]
+                                                                        : prev.targetRoles.filter(r => r !== role.id)
+                                                                }));
+                                                            }}
+                                                        />
+                                                        {role.label}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="form-footer" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
+                                        {(newAnnouncement.type === 'block' && newAnnouncement.targetBlocks.length === 0) ||
+                                            (newAnnouncement.type === 'role' && newAnnouncement.targetRoles.length === 0) ? (
+                                            <span style={{ color: '#ef4444', fontSize: '0.8rem', marginRight: '1rem' }}>
+                                                Select at least one target!
+                                            </span>
+                                        ) : null}
+                                        <button
+                                            type="submit"
+                                            className="post-btn"
+                                            disabled={
+                                                (newAnnouncement.type === 'block' && newAnnouncement.targetBlocks.length === 0) ||
+                                                (newAnnouncement.type === 'role' && newAnnouncement.targetRoles.length === 0)
+                                            }
+                                        >
+                                            Post Announcement
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -859,10 +935,28 @@ const ManagementDashboard = () => {
                                     announcements.map(a => (
                                         <div key={a._id} className={`announcement-item ${a.priority}`}>
                                             <div className="announcement-content-main">
+                                                <div className="announcement-header-meta">
+                                                    <span className="category-meta-badge">
+                                                        {a.category === 'fees' ? '💰 Fees' :
+                                                            a.category === 'cleaning' ? '🧹 Cleaning' :
+                                                                a.category === 'pest-control' ? '🕷️ Pest' :
+                                                                    a.category === 'utility-downtime' ? '⚡ Utility' :
+                                                                        a.category === 'maintenance' ? '🔧 Maint' : '📢 General'}
+                                                    </span>
+                                                    <span className="target-meta-badge">
+                                                        {a.type === 'general' ? 'Global' :
+                                                            a.type === 'block' ? `Blocks: ${Array.isArray(a.targetBlocks) && a.targetBlocks.length > 0 ? a.targetBlocks.join(', ') : (a.block || 'None')}` :
+                                                                a.type === 'role' ? `Roles: ${Array.isArray(a.targetRoles) && a.targetRoles.length > 0 ? a.targetRoles.join(', ') : 'None'}` :
+                                                                    a.type === 'hostel' ? `Hostel: ${a.hostel || 'All'}` : 'Global'}
+                                                    </span>
+                                                </div>
                                                 <div className="announcement-text">{a.text}</div>
                                                 {a.deadlineDate && (
                                                     <div className="announcement-date-badge">
-                                                        <span>📅 Deadline: {new Date(a.deadlineDate).toLocaleDateString()}</span>
+                                                        <span>
+                                                            {['fees', 'general'].includes(a.category) ? '📅 Deadline: ' : '📅 Date: '}
+                                                            {new Date(a.deadlineDate).toLocaleDateString()}
+                                                        </span>
                                                     </div>
                                                 )}
                                             </div>
@@ -877,7 +971,7 @@ const ManagementDashboard = () => {
                                                     className="social-btn"
                                                     onClick={() => setSelectedItem(selectedItem?.id === a._id ? null : { id: a._id, type: 'Announcement' })}
                                                 >
-                                                    💬 Discuss
+                                                    💬 {selectedItem?.id === a._id ? 'Close' : 'Discuss'}
                                                 </button>
                                             </div>
                                             {selectedItem?.id === a._id && (
@@ -898,152 +992,156 @@ const ManagementDashboard = () => {
                         </div>
                     )}
 
-                    {activeTab === 'analytics' && analyticsData && (
-                        <div className="analytics-view">
-                            <div className="analytics-header">
-                                <h3>Operational Analytics</h3>
-                                <button
-                                    className={`filter-toggle ${publicFilter ? 'active' : ''}`}
-                                    onClick={() => setPublicFilter(!publicFilter)}
-                                >
-                                    {publicFilter ? 'Showing: Public Only' : 'Showing: All Issues'}
-                                </button>
-                            </div>
+                    {
+                        activeTab === 'analytics' && analyticsData && (
+                            <div className="analytics-view">
+                                <div className="analytics-header">
+                                    <h3>Operational Analytics</h3>
+                                    <button
+                                        className={`filter-toggle ${publicFilter ? 'active' : ''}`}
+                                        onClick={() => setPublicFilter(!publicFilter)}
+                                    >
+                                        {publicFilter ? 'Showing: Public Only' : 'Showing: All Issues'}
+                                    </button>
+                                </div>
 
-                            <div className="stats-grid">
-                                <div className="stat-card">
-                                    <div className="stat-value">{analyticsData.avgResponse}</div>
-                                    <div className="stat-label">Avg. Response Time</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{analyticsData.avgResolution}</div>
-                                    <div className="stat-label">Avg. Resolution Time</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{analyticsData.ratio}%</div>
-                                    <div className="stat-label">Resolution Rate</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{analyticsData.total}</div>
-                                    <div className="stat-label">Total Reports</div>
-                                </div>
-                            </div>
-
-                            <div className="analytics-charts">
-                                <div className="chart-container">
-                                    <h4>Most Frequent Categories</h4>
-                                    <div className="bar-chart">
-                                        {analyticsData.categories.map(([category, count]) => (
-                                            <div key={category} className="bar-item">
-                                                <div className="bar-info">
-                                                    <span className="bar-label">{category}</span>
-                                                    <span className="bar-count">{count}</span>
-                                                </div>
-                                                <div className="bar-bg">
-                                                    <div
-                                                        className="bar-fill"
-                                                        style={{ width: `${(count / analyticsData.total) * 100}%` }}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                <div className="stats-grid">
+                                    <div className="stat-card">
+                                        <div className="stat-value">{analyticsData.avgResponse}</div>
+                                        <div className="stat-label">Avg. Response Time</div>
+                                    </div>
+                                    <div className="stat-card">
+                                        <div className="stat-value">{analyticsData.avgResolution}</div>
+                                        <div className="stat-label">Avg. Resolution Time</div>
+                                    </div>
+                                    <div className="stat-card">
+                                        <div className="stat-value">{analyticsData.ratio}%</div>
+                                        <div className="stat-label">Resolution Rate</div>
+                                    </div>
+                                    <div className="stat-card">
+                                        <div className="stat-value">{analyticsData.total}</div>
+                                        <div className="stat-label">Total Reports</div>
                                     </div>
                                 </div>
 
-                                <div className="chart-container">
-                                    <h4>Hostel/Block Density</h4>
-                                    <div className="density-list">
-                                        {analyticsData.density.map(([location, count]) => (
-                                            <div key={location} className="density-item">
-                                                <span className="density-label">{location}</span>
-                                                <span className={`density-badge ${count > 5 ? 'high' : count > 2 ? 'medium' : 'low'}`}>
-                                                    {count} issues
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'lost-found' && (
-                        <div className="lost-found-management">
-                            <h3>Manage Lost & Found</h3>
-                            {lostFoundItems.length === 0 ? (
-                                <p className="no-pending">No items reported yet.</p>
-                            ) : (
-                                <div className="complaints-list">
-                                    {lostFoundItems.map(item => (
-                                        <div key={item._id} className={`complaint-card ${item.status === 'claimed' ? 'urgent' : ''}`}>
-                                            <div className="card-header">
-                                                <span className={`priority-badge ${item.type === 'found' ? 'low' : 'high'}`}>
-                                                    {item.type.toUpperCase()}
-                                                </span>
-                                                <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : '#fbbf24' }}>
-                                                    {item.status.toUpperCase()}
-                                                </span>
-                                            </div>
-
-                                            {item.media && item.media.length > 0 && (
-                                                <div className="item-card-image">
-                                                    <img src={item.media[0]} alt={item.title} />
-                                                </div>
-                                            )}
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                <div>
-                                                    <h3 style={{ margin: '0.5rem 0' }}>{item.title}</h3>
-                                                    <p className="description-preview">{item.description}</p>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleDeleteLFItem(item._id)}
-                                                    className="delete-announcement-btn"
-                                                    title="Delete Listing"
-                                                >
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                            <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
-                                                📍 {item.location} • 📅 {new Date(item.date).toLocaleDateString()}<br />
-                                                👤 Reported by: {item.reportedBy?.email}
-                                            </div>
-
-                                            {item.status === 'claimed' && (
-                                                <div className="moderation-panel" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(251, 191, 36, 0.05)', borderRadius: '8px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
-                                                    <h4 style={{ color: '#fbbf24', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                                                        🔍 Pending Claim Review
-                                                    </h4>
-                                                    <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>
-                                                        <strong>Claimant:</strong> {item.claimant?.email}<br />
-                                                        <strong>Proof/Message:</strong> {item.claimMessage}
-                                                    </p>
-                                                    <div className="inline-btns">
-                                                        <button
-                                                            onClick={() => handleModerateClaim(item._id, 'approve')}
-                                                            className="approve-btn"
-                                                        >
-                                                            Approve Claim
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleModerateClaim(item._id, 'reject')}
-                                                            className="cancel-btn"
-                                                        >
-                                                            Reject Claim
-                                                        </button>
+                                <div className="analytics-charts">
+                                    <div className="chart-container">
+                                        <h4>Most Frequent Categories</h4>
+                                        <div className="bar-chart">
+                                            {analyticsData.categories.map(([category, count]) => (
+                                                <div key={category} className="bar-item">
+                                                    <div className="bar-info">
+                                                        <span className="bar-label">{category}</span>
+                                                        <span className="bar-count">{count}</span>
+                                                    </div>
+                                                    <div className="bar-bg">
+                                                        <div
+                                                            className="bar-fill"
+                                                            style={{ width: `${(count / analyticsData.total) * 100}%` }}
+                                                        ></div>
                                                     </div>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
-                                    ))}
+                                    </div>
+
+                                    <div className="chart-container">
+                                        <h4>Hostel/Block Density</h4>
+                                        <div className="density-list">
+                                            {analyticsData.density.map(([location, count]) => (
+                                                <div key={location} className="density-item">
+                                                    <span className="density-label">{location}</span>
+                                                    <span className={`density-badge ${count > 5 ? 'high' : count > 2 ? 'medium' : 'low'}`}>
+                                                        {count} issues
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </main>
+                            </div>
+                        )
+                    }
+
+                    {
+                        activeTab === 'lost-found' && (
+                            <div className="lost-found-management">
+                                <h3>Manage Lost & Found</h3>
+                                {lostFoundItems.length === 0 ? (
+                                    <p className="no-pending">No items reported yet.</p>
+                                ) : (
+                                    <div className="complaints-list">
+                                        {lostFoundItems.map(item => (
+                                            <div key={item._id} className={`complaint-card ${item.status === 'claimed' ? 'urgent' : ''}`}>
+                                                <div className="card-header">
+                                                    <span className={`priority-badge ${item.type === 'found' ? 'low' : 'high'}`}>
+                                                        {item.type.toUpperCase()}
+                                                    </span>
+                                                    <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : '#fbbf24' }}>
+                                                        {item.status.toUpperCase()}
+                                                    </span>
+                                                </div>
+
+                                                {item.media && item.media.length > 0 && (
+                                                    <div className="item-card-image">
+                                                        <img src={item.media[0]} alt={item.title} />
+                                                    </div>
+                                                )}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <div>
+                                                        <h3 style={{ margin: '0.5rem 0' }}>{item.title}</h3>
+                                                        <p className="description-preview">{item.description}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleDeleteLFItem(item._id)}
+                                                        className="delete-announcement-btn"
+                                                        title="Delete Listing"
+                                                    >
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                                                    📍 {item.location} • 📅 {new Date(item.date).toLocaleDateString()}<br />
+                                                    👤 Reported by: {item.reportedBy?.email}
+                                                </div>
+
+                                                {item.status === 'claimed' && (
+                                                    <div className="moderation-panel" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(251, 191, 36, 0.05)', borderRadius: '8px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+                                                        <h4 style={{ color: '#fbbf24', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                                            🔍 Pending Claim Review
+                                                        </h4>
+                                                        <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>
+                                                            <strong>Claimant:</strong> {item.claimant?.email}<br />
+                                                            <strong>Proof/Message:</strong> {item.claimMessage}
+                                                        </p>
+                                                        <div className="inline-btns">
+                                                            <button
+                                                                onClick={() => handleModerateClaim(item._id, 'approve')}
+                                                                className="approve-btn"
+                                                            >
+                                                                Approve Claim
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleModerateClaim(item._id, 'reject')}
+                                                                className="cancel-btn"
+                                                            >
+                                                                Reject Claim
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    }
+                </div >
+            </main >
 
             {showMergeModal && (
                 <div className="modal-overlay">
@@ -1082,7 +1180,7 @@ const ManagementDashboard = () => {
                     </div>
                 </div>
             )}
-        </div>
+        </div >
     );
 };
 

@@ -45,8 +45,8 @@ const userSchema = new mongoose.Schema({
     },
     managementRole: {
         type: String,
-        enum: ['admin', 'subadmin', 'caretaker'],
-        default: 'admin'
+        enum: ['admin', 'subadmin', 'caretaker', null],
+        default: null
     },
     staffSpecialization: {
         type: String,

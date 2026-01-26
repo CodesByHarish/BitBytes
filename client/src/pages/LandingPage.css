@@ -213,6 +213,48 @@
   margin-bottom: 1rem;
 }
 
+/* Role Specific Card Accents */
+.management-card {
+  border-left: 4px solid #10b981 !important;
+}
+
+.management-card:hover {
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  box-shadow: 0 20px 40px -15px rgba(16, 185, 129, 0.3) !important;
+}
+
+.management-card .management-icon {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.management-card:hover .management-icon {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.management-card .management-icon svg {
+  color: #6ee7b7;
+}
+
+.management-card .card-arrow {
+  color: #10b981;
+}
+
+.management-card::before {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.student-card {
+  border-left: 4px solid #6366f1;
+}
+
+.student-card .student-icon {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.student-card .student-icon svg {
+  color: #a5b4fc;
+}
+
 /* Footer */
 .footer {
   padding: 2rem;
