@@ -7,17 +7,17 @@ const commentSchema = new mongoose.Schema({
         trim: true
     },
     author: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User',
         required: true
     },
     entityId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         required: true
     },
     entityType: {
         type: String,
-        enum: ['Complaint', 'Announcement'],
+        enum: ['Complaint', 'Announcement', 'LostFound'],
         required: true
     },
     parentId: {
@@ -27,7 +27,7 @@ const commentSchema = new mongoose.Schema({
     },
     reactions: [{
         emoji: { type: String, default: '❤️' },
-        users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+        users: [{ type: mongoose.Schema.Types.Mixed, ref: 'User' }]
     }]
 }, {
     timestamps: true

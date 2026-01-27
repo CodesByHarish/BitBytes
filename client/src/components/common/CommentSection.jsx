@@ -156,7 +156,7 @@ const CommentSection = ({ entityId, entityType, currentUser }) => {
 
     return (
         <div className="comment-section">
-            <h4>💬 Community Discussion</h4>
+            <h4>💬 {entityType === 'LostFound' ? 'Private Discussion' : 'Community Discussion'}</h4>
 
             <div className="comments-list-container">
                 {loading ? <p>Loading discussion...</p> : renderCommentThread()}

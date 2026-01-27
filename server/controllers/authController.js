@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/tokenUtils');
 
 // @desc    Register Student
@@ -112,8 +113,7 @@ const loginStudent = async (req, res) => {
         const refreshToken = generateRefreshToken(user._id, user.role);
 
         // Save refresh token
-        user.refreshToken = refreshToken;
-        await user.save();
+        await User.updateOne({ _id: user._id }, { $set: { refreshToken } });
 
         // Set refresh token cookie
         res.cookie('refreshToken', refreshToken, {
@@ -168,8 +168,7 @@ const loginManagement = async (req, res) => {
         const refreshToken = generateRefreshToken(user._id, user.role);
 
         // Save refresh token
-        user.refreshToken = refreshToken;
-        await user.save();
+        await User.updateOne({ _id: user._id }, { $set: { refreshToken } });
 
         // Set refresh token cookie
         res.cookie('refreshToken', refreshToken, {

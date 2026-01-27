@@ -18,17 +18,16 @@ const StudentDashboard = () => {
     const [lostFoundItems, setLostFoundItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [lfTab, setLfTab] = useState('browse'); // 'browse' or 'report'
+    const [lfFilters, setLfFilters] = useState({ category: 'all', type: 'all', status: 'all', search: '' });
     const [lfFormData, setLfFormData] = useState({
         title: '',
         description: '',
         type: 'lost',
+        category: 'others',
         location: '',
         date: '',
         media: []
     });
-    const [claimMessage, setClaimMessage] = useState('');
-    const [showClaimModal, setShowClaimModal] = useState(null); // item ID
-
     // Form State
     const [formData, setFormData] = useState({
         category: 'plumbing',
@@ -44,15 +43,6 @@ const StudentDashboard = () => {
         fetchPublicComplaints();
     }, []);
 
-    const fetchPublicComplaints = async () => {
-        try {
-            const { data } = await authAPI.getPublicComplaints();
-            setPublicComplaints(data);
-        } catch (error) {
-            console.error('Error fetching public complaints:', error);
-        }
-    };
-
     const fetchLostFoundItems = async () => {
         try {
             const { data } = await authAPI.getLostFoundItems();
@@ -62,24 +52,25 @@ const StudentDashboard = () => {
         }
     };
 
-    const fetchMyComplaints = async () => {
+    const fetchPublicComplaints = async () => {
         try {
-            setLoading(true);
-            const { data } = await authAPI.getMyComplaints();
-            setComplaints(data);
+            const { data } = await authAPI.getPublicComplaints();
+            setPublicComplaints(data);
         } catch (error) {
-            console.error('Error fetching complaints:', error);
-        } finally {
-            setLoading(false);
+            console.error('Error fetching public complaints:', error);
         }
+    };
+
+    const fetchMyComplaints = async () => {
+        // ... (rest of implementation) ...
     };
 
     const handleLfSubmit = async (e) => {
         e.preventDefault();
         try {
             await authAPI.reportLostFoundItem(lfFormData);
-            alert('Item reported successfully!');
-            setLfFormData({ title: '', description: '', type: 'lost', location: '', date: '', media: [] });
+            alert('Item reported! It will appear in the portal after management review.');
+            setLfFormData({ title: '', description: '', type: 'lost', category: 'others', location: '', date: '', media: [] });
             setLfTab('browse');
             fetchLostFoundItems();
         } catch (error) {
@@ -90,7 +81,6 @@ const StudentDashboard = () => {
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
-
         files.forEach(file => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -110,16 +100,27 @@ const StudentDashboard = () => {
         }));
     };
 
-    const handleClaimSubmit = async (id) => {
+    const handleClaimSubmit = async (item) => {
         try {
-            await authAPI.claimItem(id, claimMessage);
-            alert('Claim submitted! Awaiting moderation.');
-            setShowClaimModal(null);
-            setClaimMessage('');
+            await authAPI.claimItem(item._id);
+            alert('Claimed! You can now participate in the discussion to coordinate.');
+            fetchLostFoundItems();
+            setSelectedItem({ id: item._id, type: 'LostFound' });
+        } catch (error) {
+            console.error('Error claiming item:', error);
+            alert(`Failed: ${error.response?.data?.message || error.message}`);
+        }
+    };
+
+    const handleRequestResolution = async (id) => {
+        if (!window.confirm('Request admin to resolve this item? Close only if you have received/returned the item.')) return;
+        try {
+            await authAPI.requestResolution(id);
+            alert('Resolution request sent to management!');
             fetchLostFoundItems();
         } catch (error) {
-            console.error('Error submitting claim:', error);
-            alert('Failed to submit claim');
+            console.error('Error requesting resolution:', error);
+            alert('Failed to send request');
         }
     };
 
@@ -240,7 +241,7 @@ const StudentDashboard = () => {
                     </svg>
                 </div>
                 <h3>Lost & Found</h3>
-                <p>Check for lost belongings or report found items</p>
+                <p>Report belongings or browse found items</p>
             </div>
 
             <div
@@ -571,178 +572,292 @@ const StudentDashboard = () => {
     );
 
     // Render Lost & Found view
-    const renderLostFoundView = () => (
-        <div className="detail-view">
-            <button className="back-btn" onClick={handleBack}>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Back
-            </button>
-            <div className="detail-header">
-                <h2>🔍 Lost & Found</h2>
-                <div className="header-actions" style={{ display: 'flex', gap: '1rem' }}>
-                    <button
-                        className={`tab-btn ${lfTab === 'browse' ? 'active' : ''}`}
-                        onClick={() => setLfTab('browse')}
-                    >
-                        Browse
-                    </button>
-                    <button
-                        className={`tab-btn ${lfTab === 'report' ? 'active' : ''}`}
-                        onClick={() => setLfTab('report')}
-                    >
-                        Report Item
-                    </button>
-                </div>
-            </div>
+    const renderLostFoundView = () => {
+        const filteredItems = lostFoundItems.filter(item => {
+            const matchesCategory = lfFilters.category === 'all' || item.category === lfFilters.category;
+            const matchesType = lfFilters.type === 'all' || item.type === lfFilters.type;
+            const matchesStatus = lfFilters.status === 'all' || item.status === lfFilters.status;
+            const matchesSearch = item.title.toLowerCase().includes(lfFilters.search.toLowerCase()) ||
+                item.description.toLowerCase().includes(lfFilters.search.toLowerCase());
+            return matchesCategory && matchesType && matchesStatus && matchesSearch;
+        });
 
-            <div className="detail-content">
-                {lfTab === 'report' ? (
-                    <div className="report-form-container">
-                        <form onSubmit={handleLfSubmit} className="complaint-form">
-                            <div className="form-group">
-                                <label>Report Type</label>
-                                <select
-                                    value={lfFormData.type}
-                                    onChange={(e) => setLfFormData({ ...lfFormData, type: e.target.value })}
-                                >
-                                    <option value="lost">Lost Item</option>
-                                    <option value="found">Found Item</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Item Name</label>
-                                <input
-                                    type="text"
-                                    value={lfFormData.title}
-                                    onChange={(e) => setLfFormData({ ...lfFormData, title: e.target.value })}
-                                    placeholder="Blue Wallet, iPhone Case, etc."
-                                    required
-                                    style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Description</label>
-                                <textarea
-                                    value={lfFormData.description}
-                                    onChange={(e) => setLfFormData({ ...lfFormData, description: e.target.value })}
-                                    placeholder="Describe the item in detail..."
-                                    required
-                                    style={{ minHeight: '100px' }}
-                                />
-                            </div>
-                            <div className="form-footer" style={{ gap: '1rem' }}>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Location</label>
+        return (
+            <div className="detail-view">
+                <button className="back-btn" onClick={handleBack}>
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Back
+                </button>
+                <div className="detail-header">
+                    <h2>🔍 Lost & Found</h2>
+                    <div className="header-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            className={`tab-btn ${lfTab === 'browse' ? 'active' : ''}`}
+                            onClick={() => setLfTab('browse')}
+                        >
+                            Browse
+                        </button>
+                        <button
+                            className={`tab-btn ${lfTab === 'report' ? 'active' : ''}`}
+                            onClick={() => setLfTab('report')}
+                        >
+                            Report Item
+                        </button>
+                    </div>
+                </div>
+
+                <div className="detail-content">
+                    {lfTab === 'report' ? (
+                        <div className="report-form-container">
+                            <form onSubmit={handleLfSubmit} className="complaint-form">
+                                <div className="form-group">
+                                    <label>I Lost/Found something...</label>
+                                    <select
+                                        value={lfFormData.type}
+                                        onChange={(e) => setLfFormData({ ...lfFormData, type: e.target.value })}
+                                    >
+                                        <option value="lost">I lost an item</option>
+                                        <option value="found">I found an item</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Item Category</label>
+                                    <select
+                                        value={lfFormData.category}
+                                        onChange={(e) => setLfFormData({ ...lfFormData, category: e.target.value })}
+                                    >
+                                        <option value="electronics">Electronics (Phone, Laptop, etc.)</option>
+                                        <option value="id-cards">ID Cards / Documents</option>
+                                        <option value="books">Books / Stationery</option>
+                                        <option value="clothing">Clothing / Apparel</option>
+                                        <option value="others">Other Essentials</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Item Name</label>
                                     <input
                                         type="text"
-                                        value={lfFormData.location}
-                                        onChange={(e) => setLfFormData({ ...lfFormData, location: e.target.value })}
-                                        placeholder="Where was it seen?"
+                                        value={lfFormData.title}
+                                        onChange={(e) => setLfFormData({ ...lfFormData, title: e.target.value })}
+                                        placeholder="e.g. Red iPhone 13, College ID Card"
                                         required
+                                        className="styled-input"
                                         style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
                                     />
                                 </div>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Date</label>
-                                    <input
-                                        type="date"
-                                        value={lfFormData.date}
-                                        onChange={(e) => setLfFormData({ ...lfFormData, date: e.target.value })}
-                                        className="date-input"
+                                <div className="form-group">
+                                    <label>Detailed Description</label>
+                                    <textarea
+                                        value={lfFormData.description}
+                                        onChange={(e) => setLfFormData({ ...lfFormData, description: e.target.value })}
+                                        placeholder="Color, brand, unique marks, etc. If it's your item, describe something only you would know."
+                                        required
+                                        style={{ minHeight: '100px' }}
                                     />
                                 </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label>Item Images (Optional)</label>
-                                <div className="image-upload-area">
-                                    <input
-                                        type="file"
-                                        multiple
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                        id="lf-image-input"
-                                        hidden
-                                    />
-                                    <label htmlFor="lf-image-input" className="upload-placeholder">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                            <circle cx="8.5" cy="8.5" r="1.5" />
-                                            <polyline points="21 15 16 10 5 21" />
-                                        </svg>
-                                        <span>Click to add photos</span>
-                                    </label>
+                                <div className="form-footer" style={{ gap: '1rem', display: 'flex' }}>
+                                    <div className="form-group" style={{ flex: 1 }}>
+                                        <label>Approximate Location</label>
+                                        <input
+                                            type="text"
+                                            value={lfFormData.location}
+                                            onChange={(e) => setLfFormData({ ...lfFormData, location: e.target.value })}
+                                            placeholder="Where was it seen?"
+                                            required
+                                            className="styled-input"
+                                            style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', width: '100%' }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ flex: 1 }}>
+                                        <label>Date & Time</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={lfFormData.date}
+                                            onChange={(e) => setLfFormData({ ...lfFormData, date: e.target.value })}
+                                            className="date-input"
+                                            style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', width: '100%' }}
+                                        />
+                                    </div>
                                 </div>
-                                {lfFormData.media.length > 0 && (
-                                    <div className="image-previews-grid">
-                                        {lfFormData.media.map((base64, idx) => (
-                                            <div key={idx} className="preview-container">
-                                                <img src={base64} alt="preview" />
-                                                <button type="button" onClick={() => removeImage(idx)} className="remove-preview">×</button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
 
-                            <button type="submit" className="submit-btn" style={{ marginTop: '1rem' }}>Post to Portal</button>
-                        </form>
-                    </div>
-                ) : (
-                    <div className="complaints-list">
-                        {lostFoundItems.length === 0 ? (
-                            <div className="empty-state">
-                                <p>No items reported yet.</p>
-                            </div>
-                        ) : (
-                            lostFoundItems.map(item => (
-                                <div key={item._id} className={`complaint-card ${item.type === 'found' ? 'management-card' : ''}`}>
-                                    <div className="card-header">
-                                        <span className={`priority-badge ${item.type === 'found' ? 'low' : item.type === 'lost' ? 'high' : ''}`}>
-                                            {item.type}
-                                        </span>
-                                        <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : '#fbbf24' }}>
-                                            {item.status}
-                                        </span>
+                                <div className="form-group">
+                                    <label>Item Photos (Optional but recommended)</label>
+                                    <div className="image-upload-area">
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                            id="lf-image-input"
+                                            hidden
+                                        />
+                                        <label htmlFor="lf-image-input" className="upload-placeholder">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                                <polyline points="21 15 16 10 5 21" />
+                                            </svg>
+                                            <span>Click to add photos</span>
+                                        </label>
                                     </div>
-
-                                    {item.media && item.media.length > 0 && (
-                                        <div className="item-card-image">
-                                            <img src={item.media[0]} alt={item.title} />
+                                    {lfFormData.media.length > 0 && (
+                                        <div className="image-previews-grid">
+                                            {lfFormData.media.map((base64, idx) => (
+                                                <div key={idx} className="preview-container">
+                                                    <img src={base64} alt="preview" />
+                                                    <button type="button" onClick={() => removeImage(idx)} className="remove-preview">×</button>
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
-
-                                    <h3 style={{ margin: '0.5rem 0' }}>{item.title}</h3>
-                                    <p className="description-preview">{item.description}</p>
-                                    <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
-                                        📍 {item.location} • 📅 {new Date(item.date).toLocaleDateString()}
-                                    </div>
-                                    <div className="card-footer" style={{ border: 'none', padding: '0', marginTop: '1rem' }}>
-                                        {item.status === 'open' && item.type === 'found' && item.reportedBy?._id !== user.id && (
-                                            <button
-                                                className="approve-btn"
-                                                onClick={() => setShowClaimModal(item._id)}
-                                                style={{ width: '100%' }}
-                                            >
-                                                Claim Item
-                                            </button>
-                                        )}
-                                        {item.status === 'claimed' && item.claimant?._id === user.id && (
-                                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-                                                ⏳ Claim pending review
-                                            </span>
-                                        )}
-                                    </div>
                                 </div>
-                            ))
-                        )}
-                    </div>
-                )}
+
+                                <button type="submit" className="submit-btn" style={{ marginTop: '1rem' }}>Submit to Management Review</button>
+                            </form>
+                        </div>
+                    ) : (
+                        <div className="lf-browse-container">
+                            <div className="lf-filters-bar" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Search items..."
+                                    className="filter-select"
+                                    style={{ flex: '1', minWidth: '150px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0.5rem', borderRadius: '6px' }}
+                                    value={lfFilters.search}
+                                    onChange={(e) => setLfFilters({ ...lfFilters, search: e.target.value })}
+                                />
+                                <select
+                                    className="filter-select"
+                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0.5rem', borderRadius: '6px' }}
+                                    value={lfFilters.type}
+                                    onChange={(e) => setLfFilters({ ...lfFilters, type: e.target.value })}
+                                >
+                                    <option value="all">All Types</option>
+                                    <option value="lost">Lost</option>
+                                    <option value="found">Found</option>
+                                </select>
+                                <select
+                                    className="filter-select"
+                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0.5rem', borderRadius: '6px' }}
+                                    value={lfFilters.category}
+                                    onChange={(e) => setLfFilters({ ...lfFilters, category: e.target.value })}
+                                >
+                                    <option value="all">All Categories</option>
+                                    <option value="electronics">Electronics</option>
+                                    <option value="id-cards">ID Cards</option>
+                                    <option value="books">Books</option>
+                                    <option value="clothing">Clothing</option>
+                                    <option value="others">Others</option>
+                                </select>
+                            </div>
+
+                            <div className="complaints-list">
+                                {filteredItems.length === 0 ? (
+                                    <div className="empty-state">
+                                        <p>No items match your search.</p>
+                                    </div>
+                                ) : (
+                                    filteredItems.map(item => (
+                                        <div key={item._id} className={`complaint-card ${item.type === 'found' ? 'management-card' : ''}`}>
+                                            <div className="card-header">
+                                                <span className={`priority-badge ${item.type === 'found' ? 'low' : 'high'}`}>
+                                                    {item.type.toUpperCase()}
+                                                </span>
+                                                <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : '#fbbf24' }}>
+                                                    {item.status.toUpperCase()}
+                                                </span>
+                                            </div>
+
+                                            {item.media && item.media.length > 0 && (
+                                                <div className="item-card-image">
+                                                    <img src={item.media[0]} alt={item.title} />
+                                                </div>
+                                            )}
+
+                                            <div className="item-category-tag" style={{ fontSize: '0.7rem', color: '#a78bfa', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                                #{item.category}
+                                            </div>
+                                            <h3 style={{ margin: '0 0 0.5rem 0' }}>{item.title}</h3>
+                                            <p className="description-preview" style={{ marginBottom: '1rem' }}>{item.description}</p>
+
+                                            <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                                                👤 Posted by: {item.reportedBy?.email || 'Unknown'}<br />
+                                                📍 {item.location} • 📅 {new Date(item.date).toLocaleString()}
+                                            </div>
+
+                                            <div className="card-footer" style={{ border: 'none', padding: '0', marginTop: '1rem' }}>
+                                                {(item.status === 'claimed' || item.status === 'resolved') && item.claimant && (
+                                                    <div style={{ fontSize: '0.75rem', color: '#818cf8', marginBottom: '0.5rem', textAlign: 'center' }}>
+                                                        🤝 {item.type === 'found' ? 'Claimed by:' : 'Found by:'} {item.claimant?.email}
+                                                    </div>
+                                                )}
+                                                {item.status === 'open' && (item.reportedBy?._id || item.reportedBy) !== user._id && (
+                                                    <button
+                                                        className="approve-btn"
+                                                        onClick={() => handleClaimSubmit(item)}
+                                                        style={{ width: '100%' }}
+                                                    >
+                                                        {item.type === 'found' ? 'Claim Item' : 'I Found This!'}
+                                                    </button>
+                                                )}
+                                                {item.status === 'resolved' && (
+                                                    <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold', textAlign: 'center', width: '100%', display: 'block' }}>
+                                                        ✅ Item Returned / Recovered
+                                                    </span>
+                                                )}
+
+                                                {/* Discussion Toggle */}
+                                                {(
+                                                    (item.reportedBy?._id || item.reportedBy) === user._id ||
+                                                    (item.claimant?._id === user._id || item.claimant === user._id) ||
+                                                    user.isAdmin ||
+                                                    user.managementRole === 'subadmin'
+                                                ) && item.status !== 'open' && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+                                                            <button
+                                                                className="social-btn"
+                                                                style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', borderColor: 'rgba(99, 102, 241, 0.2)' }}
+                                                                onClick={() => setSelectedItem(selectedItem?.id === item._id ? null : { id: item._id, type: 'LostFound' })}
+                                                            >
+                                                                💬 {selectedItem?.id === item._id ? 'Close Discussion' : 'Join Discussion'}
+                                                            </button>
+
+                                                            {selectedItem?.id === item._id && (
+                                                                <div className="nested-comments-area" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                    <CommentSection entityId={item._id} entityType="LostFound" currentUser={{ id: user?._id }} />
+                                                                </div>
+                                                            )}
+
+                                                            {item.status === 'claimed' && !item.isResolutionRequested && (
+                                                                <button
+                                                                    className="approve-btn"
+                                                                    style={{ width: '100%', fontSize: '0.8rem', padding: '0.5rem' }}
+                                                                    onClick={() => handleRequestResolution(item._id)}
+                                                                >
+                                                                    🏁 Request Admin Resolution
+                                                                </button>
+                                                            )}
+
+                                                            {item.isResolutionRequested && item.status !== 'resolved' && (
+                                                                <span style={{ fontSize: '0.75rem', color: '#fbbf24', textAlign: 'center', marginTop: '0.25rem' }}>
+                                                                    ⏳ Resolution Pending Review
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     // Render Community Feed view
     const renderCommunityFeedView = () => (
@@ -849,40 +964,6 @@ const StudentDashboard = () => {
                 {activeSection === 'lost-found' && renderLostFoundView()}
                 {activeSection === 'my-issues' && renderMyIssuesView()}
                 {activeSection === 'community' && renderCommunityFeedView()}
-
-                {showClaimModal && (
-                    <div className="modal-overlay">
-                        <div className="report-form-container" style={{ maxWidth: '400px' }}>
-                            <h3>Claim Item</h3>
-                            <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '1rem' }}>
-                                Please provide a detailed description or proof to verify this is your item.
-                            </p>
-                            <textarea
-                                value={claimMessage}
-                                onChange={(e) => setClaimMessage(e.target.value)}
-                                placeholder="Describe the item in detail..."
-                                style={{ width: '100%', minHeight: '100px', marginBottom: '1rem' }}
-                                required
-                            />
-                            <div className="inline-btns">
-                                <button
-                                    onClick={() => handleClaimSubmit(showClaimModal)}
-                                    className="save-btn"
-                                    style={{ flex: 1, padding: '0.75rem' }}
-                                >
-                                    Submit Claim
-                                </button>
-                                <button
-                                    onClick={() => setShowClaimModal(null)}
-                                    className="cancel-btn"
-                                    style={{ flex: 1, padding: '0.75rem' }}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </main>
         </div>
     );

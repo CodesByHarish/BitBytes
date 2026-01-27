@@ -34,12 +34,12 @@ const lostFoundSchema = new mongoose.Schema({
         type: String // URLs to images
     }],
     reportedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User',
         required: true
     },
     claimant: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User',
         default: null
     },
@@ -47,18 +47,24 @@ const lostFoundSchema = new mongoose.Schema({
         type: String,
         default: null
     },
-    moderationStatus: {
+    category: {
         type: String,
-        enum: ['none', 'pending', 'approved', 'rejected'],
-        default: 'none'
+        enum: ['electronics', 'id-cards', 'books', 'clothing', 'others'],
+        default: 'others'
+    },
+    isApproved: {
+        type: Boolean,
+        default: false
+    },
+    isResolutionRequested: {
+        type: Boolean,
+        default: false
     },
     hostel: {
-        type: String,
-        required: true
+        type: String
     },
     block: {
-        type: String,
-        required: true
+        type: String
     }
 }, {
     timestamps: true

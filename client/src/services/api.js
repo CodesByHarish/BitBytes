@@ -80,18 +80,21 @@ export const authAPI = {
     createAnnouncement: (data) => api.post('/announcements', data),
     deleteAnnouncement: (id) => api.delete(`/announcements/${id}`),
 
+
     // Lost & Found endpoints
     getLostFoundItems: () => api.get('/lost-found'),
     reportLostFoundItem: (data) => api.post('/lost-found', data),
     claimItem: (id, claimMessage) => api.put(`/lost-found/${id}/claim`, { claimMessage }),
     moderateClaim: (id, action) => api.put(`/lost-found/${id}/moderate`, { action }),
+    requestResolution: (id) => api.put(`/lost-found/${id}/request-resolution`),
     deleteLostFoundItem: (id) => api.delete(`/lost-found/${id}`),
 
     // Social & Comment endpoints
     upvoteComplaint: (id) => api.post(`/complaints/${id}/upvote`),
     upvoteAnnouncement: (id) => api.post(`/announcements/${id}/upvote`),
-    getComments: (type, id) => api.get(`/comments/${type}/${id}`),
+    getComments: (entityType, entityId) => api.get(`/comments/${entityType}/${entityId}`),
     addComment: (data) => api.post('/comments', data),
+
     reactToComment: (id, emoji = '❤️') => api.post(`/comments/${id}/react`, { emoji })
 };
 

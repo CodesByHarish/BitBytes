@@ -269,25 +269,28 @@ const ManagementDashboard = () => {
         }
     };
 
-    const handleModerateClaim = async (id, action) => {
+    const handleModerateLF = async (id, action) => {
         try {
             await authAPI.moderateClaim(id, action);
-            alert(`Claim ${action === 'approve' ? 'approved' : 'rejected'}!`);
+            if (action === 'approve_post') alert('Post approved and live!');
+            else if (action === 'reject_post') alert('Post rejected and removed.');
+            else if (action === 'approve_claim') alert('Claim finalized!');
+            else alert('Claim rejected, item back to open.');
             fetchData();
         } catch (error) {
-            console.error('Error moderating claim:', error);
-            alert('Failed to moderate claim');
+            console.error('Error moderating:', error);
+            alert('Moderation failed');
         }
     };
 
     const handleDeleteLFItem = async (id) => {
-        if (!window.confirm('Delete this item listing?')) return;
+        if (!window.confirm('Delete this listing permanently?')) return;
         try {
             await authAPI.deleteLostFoundItem(id);
             fetchData();
         } catch (error) {
-            console.error('Error deleting item:', error);
-            alert('Failed to delete item');
+            console.error('Error deleting:', error);
+            alert('Delete failed');
         }
     };
 
@@ -1062,22 +1065,40 @@ const ManagementDashboard = () => {
                             </div>
                         )
                     }
-
                     {
                         activeTab === 'lost-found' && (
                             <div className="lost-found-management">
-                                <h3>Manage Lost & Found</h3>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                    <h3>Moderate Lost & Found</h3>
+                                    <div className="status-counts" style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+                                        <span style={{ color: '#fbbf24' }}>⌛ {lostFoundItems.filter(i => !i.isApproved).length} Pending Posts</span>
+                                        <span style={{ color: '#6366f1' }}>🔍 {lostFoundItems.filter(i => i.status === 'claimed').length} Claims</span>
+                                    </div>
+                                </div>
+
                                 {lostFoundItems.length === 0 ? (
-                                    <p className="no-pending">No items reported yet.</p>
+                                    <p className="no-pending">No reports or claims to review.</p>
                                 ) : (
                                     <div className="complaints-list">
                                         {lostFoundItems.map(item => (
-                                            <div key={item._id} className={`complaint-card ${item.status === 'claimed' ? 'urgent' : ''}`}>
+                                            <div key={item._id} className={`complaint-card ${!item.isApproved ? 'urgent' : item.status === 'claimed' ? 'management-card' : ''}`} style={!item.isApproved ? { borderLeft: '4px solid #f59e0b' } : {}}>
                                                 <div className="card-header">
-                                                    <span className={`priority-badge ${item.type === 'found' ? 'low' : 'high'}`}>
-                                                        {item.type.toUpperCase()}
-                                                    </span>
-                                                    <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : '#fbbf24' }}>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                        <span className={`priority-badge ${item.type === 'found' ? 'low' : 'high'}`}>
+                                                            {item.type.toUpperCase()}
+                                                        </span>
+                                                        {!item.isApproved && (
+                                                            <span className="priority-badge urgent" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid currentColor' }}>
+                                                                PENDING APPROVAL
+                                                            </span>
+                                                        )}
+                                                        {item.isResolutionRequested && item.status !== 'resolved' && (
+                                                            <span className="priority-badge urgent" style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34d399', border: '1px solid currentColor' }}>
+                                                                RESOLUTION REQUESTED
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="status-badge" style={{ color: item.status === 'open' ? '#34d399' : item.status === 'resolved' ? '#10b981' : '#fbbf24' }}>
                                                         {item.status.toUpperCase()}
                                                     </span>
                                                 </div>
@@ -1087,52 +1108,61 @@ const ManagementDashboard = () => {
                                                         <img src={item.media[0]} alt={item.title} />
                                                     </div>
                                                 )}
+
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                     <div>
-                                                        <h3 style={{ margin: '0.5rem 0' }}>{item.title}</h3>
-                                                        <p className="description-preview">{item.description}</p>
+                                                        <span style={{ fontSize: '0.7rem', color: '#a78bfa', fontWeight: 'bold' }}>#{item.category}</span>
+                                                        <h3 style={{ margin: '0.25rem 0' }}>{item.title}</h3>
+                                                        <p className="description-preview" style={{ marginBottom: '1rem' }}>{item.description}</p>
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleDeleteLFItem(item._id)}
-                                                        className="delete-announcement-btn"
-                                                        title="Delete Listing"
-                                                    >
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                                <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
-                                                    📍 {item.location} • 📅 {new Date(item.date).toLocaleDateString()}<br />
-                                                    👤 Reported by: {item.reportedBy?.email}
+                                                    <button onClick={() => handleDeleteLFItem(item._id)} className="delete-icon-btn" title="Delete Permanent">🗑️</button>
                                                 </div>
 
-                                                {item.status === 'claimed' && (
-                                                    <div className="moderation-panel" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(251, 191, 36, 0.05)', borderRadius: '8px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
-                                                        <h4 style={{ color: '#fbbf24', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                                                            🔍 Pending Claim Review
+                                                <div className="caretaker-info" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem', padding: '0.75rem', borderRadius: '6px' }}>
+                                                    👤 <strong>Posted by:</strong> {item.reportedBy?.email}<br />
+                                                    📍 {item.location} • 📅 {new Date(item.date).toLocaleString()}
+                                                </div>
+
+                                                {item.isApproved && (
+                                                    (user.isAdmin || user.managementRole === 'subadmin') ||
+                                                    (item.reportedBy?._id || item.reportedBy) === user._id ||
+                                                    (item.claimant?._id === user._id || item.claimant === user._id)
+                                                ) && (
+                                                        <div className="discussion-toggle" style={{ marginTop: '1rem' }}>
+                                                            <button
+                                                                className="social-btn"
+                                                                style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', borderColor: 'rgba(99, 102, 241, 0.2)' }}
+                                                                onClick={() => setSelectedItem(selectedItem?.id === item._id ? null : { id: item._id, type: 'LostFound' })}
+                                                            >
+                                                                💬 {selectedItem?.id === item._id ? 'Close Discussion' : 'Join Discussion'}
+                                                            </button>
+                                                            {selectedItem?.id === item._id && (
+                                                                <div className="nested-comments-area" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                    <CommentSection entityId={item._id} entityType="LostFound" currentUser={{ id: user?._id }} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                {!item.isApproved ? (
+                                                    <div className="moderation-panel" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                                                        <button onClick={() => handleModerateLF(item._id, 'approve_post')} className="approve-btn" style={{ flex: 1 }}>Approve Post</button>
+                                                        <button onClick={() => handleModerateLF(item._id, 'reject_post')} className="cancel-btn" style={{ flex: 1 }}>Reject & Delete</button>
+                                                    </div>
+                                                ) : (item.status === 'claimed' || item.isResolutionRequested) ? (
+                                                    <div className="moderation-panel" style={{ marginTop: '1rem', padding: '1rem', background: item.isResolutionRequested ? 'rgba(52, 211, 153, 0.05)' : 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', border: `1px solid ${item.isResolutionRequested ? 'rgba(52, 211, 153, 0.2)' : 'rgba(99, 102, 241, 0.2)'}` }}>
+                                                        <h4 style={{ color: item.isResolutionRequested ? '#34d399' : '#818cf8', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                                            {item.isResolutionRequested ? '🏁 Resolution Requested' : '🤝 Item Claimed / Handover Coordination'}
                                                         </h4>
-                                                        <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>
-                                                            <strong>Claimant:</strong> {item.claimant?.email}<br />
-                                                            <strong>Proof/Message:</strong> {item.claimMessage}
+                                                        <p style={{ fontSize: '0.8rem', marginBottom: '1rem' }}>
+                                                            <strong>Claimant:</strong> {item.claimant?.email || 'Student'}
                                                         </p>
-                                                        <div className="inline-btns">
-                                                            <button
-                                                                onClick={() => handleModerateClaim(item._id, 'approve')}
-                                                                className="approve-btn"
-                                                            >
-                                                                Approve Claim
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleModerateClaim(item._id, 'reject')}
-                                                                className="cancel-btn"
-                                                            >
-                                                                Reject Claim
-                                                            </button>
+                                                        <div className="inline-btns" style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <button onClick={() => handleModerateLF(item._id, 'approve_claim')} className="approve-btn" style={{ flex: 1 }}>Accept & Resolve</button>
+                                                            <button onClick={() => handleModerateLF(item._id, 'reject_claim')} className="cancel-btn" style={{ flex: 1 }}>Reject & Open</button>
                                                         </div>
                                                     </div>
-                                                )}
+                                                ) : null}
                                             </div>
                                         ))}
                                     </div>
@@ -1140,6 +1170,7 @@ const ManagementDashboard = () => {
                             </div>
                         )
                     }
+
                 </div >
             </main >
 
