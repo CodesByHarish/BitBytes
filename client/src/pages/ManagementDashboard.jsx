@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import ProfileDropdown from '../components/common/ProfileDropdown';
 import CommentSection from '../components/common/CommentSection';
+import LeaveListAdmin from '../components/leaves/LeaveListAdmin';
 import './Dashboard.css';
 
 const ManagementDashboard = () => {
@@ -328,6 +329,102 @@ const ManagementDashboard = () => {
         }
     };
 
+    const handleBack = () => {
+        setActiveTab('issues');
+    };
+
+    // Render Management Profile View
+    const renderProfileView = () => (
+        <div className="detail-view">
+            <button className="back-btn" onClick={handleBack}>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back
+            </button>
+            <div className="detail-header">
+                <h2>👤 Management Profile</h2>
+            </div>
+            <div className="detail-content">
+                <div className="profile-container">
+                    <div className="profile-header-card">
+                        <div className="profile-avatar-large">
+                            {user?.email?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="profile-main-info">
+                            <h3>{user?.email}</h3>
+                            <span className="profile-badge management">{user?.managementRole || 'Staff'}</span>
+                        </div>
+                    </div>
+
+                    <div className="profile-details-grid">
+                        <div className="detail-item">
+                            <label>Designation</label>
+                            <p>{user?.managementRole ? (user.managementRole.charAt(0).toUpperCase() + user.managementRole.slice(1)) : 'Management Staff'}</p>
+                        </div>
+                        {user?.managementRole === 'caretaker' && (
+                            <div className="detail-item">
+                                <label>Specialization</label>
+                                <p>{user?.staffSpecialization || 'General'}</p>
+                            </div>
+                        )}
+                        <div className="detail-item">
+                            <label>Account Status</label>
+                            <p className="status-active">Verified Staff</p>
+                        </div>
+                        <div className="detail-item">
+                            <label>Permissions</label>
+                            <p>{user?.isAdmin ? 'Full Admin Access' : 'Staff Access'}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Render Help & Support View (Same contacts for consistency)
+    const renderHelpView = () => (
+        <div className="detail-view">
+            <button className="back-btn" onClick={handleBack}>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back
+            </button>
+            <div className="detail-header">
+                <h2>❓ Help & Support</h2>
+            </div>
+            <div className="detail-content">
+                <div className="help-container">
+                    <section className="help-section">
+                        <h3>Administration Contact Information</h3>
+                        <p className="help-intro">For technical support or administrative queries, please contact the system administrators:</p>
+
+                        <div className="contact-cards">
+                            <div className="contact-card">
+                                <div className="contact-icon admin">A</div>
+                                <div className="contact-info">
+                                    <h4>System Administrator</h4>
+                                    <p>📧 admin@hostelease.com</p>
+                                    <p>📞 +91 9876543210</p>
+                                </div>
+                            </div>
+
+                            <div className="contact-card">
+                                <div className="contact-icon subadmin">S</div>
+                                <div className="contact-info">
+                                    <h4>Management Support</h4>
+                                    <p>📧 support@hostelease.com</p>
+                                    <p>📞 +91 8765432109</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="dashboard management-dashboard">
             <header className="dashboard-header">
@@ -345,7 +442,7 @@ const ManagementDashboard = () => {
                     </span>
                 </div>
                 <div className="header-right">
-                    <ProfileDropdown />
+                    <ProfileDropdown onAction={(action) => setActiveTab(action)} />
                 </div>
             </header>
 
@@ -462,6 +559,12 @@ const ManagementDashboard = () => {
                                 onClick={() => setActiveTab('lost-found')}
                             >
                                 Lost & Found
+                            </button>
+                            <button
+                                className={`tab-btn ${activeTab === 'leaves' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('leaves')}
+                            >
+                                Leaves & Outpass
                             </button>
                         </>
                     )}
@@ -1170,6 +1273,17 @@ const ManagementDashboard = () => {
                             </div>
                         )
                     }
+                    {activeTab === 'profile' && renderProfileView()}
+                    {activeTab === 'help' && renderHelpView()}
+
+                    {activeTab === 'leaves' && (
+                        <div className="leaves-management-section">
+                            <div className="section-header">
+                                <h3>Manage Gate Passes & Leaves</h3>
+                            </div>
+                            <LeaveListAdmin />
+                        </div>
+                    )}
 
                 </div >
             </main >

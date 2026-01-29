@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import './ProfileDropdown.css';
 
-const ProfileDropdown = () => {
+const ProfileDropdown = ({ onAction }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
@@ -25,6 +25,13 @@ const ProfileDropdown = () => {
     const handleLogout = async () => {
         await logout();
         navigate('/');
+    };
+
+    const handleAction = (action) => {
+        setIsOpen(false);
+        if (onAction) {
+            onAction(action);
+        }
     };
 
     return (
@@ -54,6 +61,26 @@ const ProfileDropdown = () => {
                                 </>
                             ) : 'Student'}
                         </span>
+                    </div>
+
+                    <div className="dropdown-divider"></div>
+
+                    <div className="dropdown-items">
+                        <button onClick={() => handleAction('profile')} className="dropdown-item">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            My Profile
+                        </button>
+                        <button onClick={() => handleAction('help')} className="dropdown-item">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                                <path d="M9.09 9C9.3251 8.33167 9.78915 7.76811 10.4 7.40913C11.0108 7.05016 11.7289 6.91894 12.4272 7.03871C13.1255 7.15849 13.7588 7.52152 14.2151 8.06353C14.6713 8.60553 14.9211 9.29152 14.92 10C14.92 12 11.92 13 11.92 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Help & Support
+                        </button>
                     </div>
 
                     <div className="dropdown-divider"></div>

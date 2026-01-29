@@ -95,7 +95,15 @@ export const authAPI = {
     getComments: (entityType, entityId) => api.get(`/comments/${entityType}/${entityId}`),
     addComment: (data) => api.post('/comments', data),
 
-    reactToComment: (id, emoji = '❤️') => api.post(`/comments/${id}/react`, { emoji })
+    reactToComment: (id, emoji = '❤️') => api.post(`/comments/${id}/react`, { emoji }),
+
+    // Leaves and Outpass
+    createLeave: (data) => api.post('/leaves', data),
+    getMyLeaves: () => api.get('/leaves/my'),
+    getAllLeaves: (params) => api.get('/leaves', { params }),
+    updateLeaveStatus: (id, status, remarks) => api.put(`/leaves/${id}/status`, { status, remarks }),
+    cancelLeave: (id) => api.put(`/leaves/${id}/cancel`),
+    deleteLeave: (id) => api.delete(`/leaves/${id}`)
 };
 
 export default api;

@@ -34,6 +34,7 @@ app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/lost-found', require('./routes/lostFoundRoutes'));
 app.use('/api/comments', require('./routes/commentRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
+app.use('/api/leaves', require('./routes/leaveRoutes')); // Leaves and Outpass routes
 
 // Health check
 app.get('/api/health', (req, res) => {

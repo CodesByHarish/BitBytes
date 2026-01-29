@@ -5,6 +5,7 @@ import ProfileDropdown from '../components/common/ProfileDropdown';
 import AnnouncementTicker from '../components/common/AnnouncementTicker';
 import { authAPI } from '../services/api';
 import CommentSection from '../components/common/CommentSection';
+import LeavesLayout from '../components/leaves/LeavesLayout';
 import './Dashboard.css';
 
 const StudentDashboard = () => {
@@ -278,6 +279,19 @@ const StudentDashboard = () => {
                 {publicComplaints.length > 0 && (
                     <span className="nav-box-badge" style={{ background: '#3b82f6' }}>{publicComplaints.length}</span>
                 )}
+            </div>
+
+            <div
+                className="nav-box leaves-box"
+                onClick={() => setActiveSection('leaves')}
+            >
+                <div className="nav-box-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16 2L16 6M8 2L8 6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </div>
+                <h3>Leaves & Outpass</h3>
+                <p>Apply for gate pass or leave</p>
             </div>
         </div>
     );
@@ -925,6 +939,108 @@ const StudentDashboard = () => {
         </div>
     );
 
+    // Render Student Profile view
+    const renderProfileView = () => (
+        <div className="detail-view">
+            <button className="back-btn" onClick={handleBack}>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back
+            </button>
+            <div className="detail-header">
+                <h2>👤 Student Profile</h2>
+            </div>
+            <div className="detail-content">
+                <div className="profile-container">
+                    <div className="profile-header-card">
+                        <div className="profile-avatar-large">
+                            {user?.email?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="profile-main-info">
+                            <h3>{user?.email}</h3>
+                            <span className="profile-badge student">Student</span>
+                        </div>
+                    </div>
+
+                    <div className="profile-details-grid">
+                        <div className="detail-item">
+                            <label>Hostel</label>
+                            <p>{user?.hostel || 'Not Assigned'}</p>
+                        </div>
+                        <div className="detail-item">
+                            <label>Block</label>
+                            <p>Block {user?.block || 'N/A'}</p>
+                        </div>
+                        <div className="detail-item">
+                            <label>Room Number</label>
+                            <p>{user?.roomNumber || 'Not Set'}</p>
+                        </div>
+                        <div className="detail-item">
+                            <label>Account Status</label>
+                            <p className="status-active">Active</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Render Help & Support view
+    const renderHelpView = () => (
+        <div className="detail-view">
+            <button className="back-btn" onClick={handleBack}>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back
+            </button>
+            <div className="detail-header">
+                <h2>❓ Help & Support</h2>
+            </div>
+            <div className="detail-content">
+                <div className="help-container">
+                    <section className="help-section">
+                        <h3>Management Contact Information</h3>
+                        <p className="help-intro">For urgent issues regarding your stay or hostel facilities, please contact our administration staff:</p>
+
+                        <div className="contact-cards">
+                            <div className="contact-card">
+                                <div className="contact-icon admin">A</div>
+                                <div className="contact-info">
+                                    <h4>Chief Warden (Admin)</h4>
+                                    <p>📧 admin@hostelease.com</p>
+                                    <p>📞 +91 9876543210</p>
+                                </div>
+                            </div>
+
+                            <div className="contact-card">
+                                <div className="contact-icon subadmin">S</div>
+                                <div className="contact-info">
+                                    <h4>Assistant Warden (Sub-Admin)</h4>
+                                    <p>📧 support@hostelease.com</p>
+                                    <p>📞 +91 8765432109</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="help-section help-faq">
+                        <h3>Frequently Asked Questions</h3>
+                        <div className="faq-item">
+                            <h4>How do I apply for a leave?</h4>
+                            <p>Go to the "Leaves & Outpass" section from the dashboard and click "New Request".</p>
+                        </div>
+                        <div className="faq-item">
+                            <h4>Where can I see my complaints?</h4>
+                            <p>All your complaints can be tracked under "My Issues" on the dashboard.</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="dashboard">
             <header className="dashboard-header">
@@ -939,7 +1055,7 @@ const StudentDashboard = () => {
                     </Link>
                 </div>
                 <div className="header-right">
-                    <ProfileDropdown />
+                    <ProfileDropdown onAction={(action) => setActiveSection(action)} />
                 </div>
             </header>
 
@@ -964,6 +1080,9 @@ const StudentDashboard = () => {
                 {activeSection === 'lost-found' && renderLostFoundView()}
                 {activeSection === 'my-issues' && renderMyIssuesView()}
                 {activeSection === 'community' && renderCommunityFeedView()}
+                {activeSection === 'leaves' && <LeavesLayout onBack={handleBack} />}
+                {activeSection === 'profile' && renderProfileView()}
+                {activeSection === 'help' && renderHelpView()}
             </main>
         </div>
     );
