@@ -295,6 +295,57 @@ const ManagementDashboard = () => {
         }
     };
 
+    const handleDeleteComplaint = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this complaint permanently?')) return;
+        try {
+            await authAPI.deleteComplaint(id);
+            setComplaints(prev => prev.filter(c => c._id !== id));
+            fetchData();
+        } catch (error) {
+            console.error('Error deleting complaint:', error);
+            const msg = error.response?.data?.message || error.message || 'Failed to delete complaint';
+            alert(`Error: ${msg}`);
+        }
+    };
+
+    const handleBulkDelete = async (ids) => {
+        if (!ids || ids.length === 0) return;
+        if (!window.confirm(`Permanently delete ${ids.length} selected issues?`)) return;
+
+        try {
+            await authAPI.bulkDeleteComplaints(ids);
+            setComplaints(prev => prev.filter(c => !ids.includes(c._id)));
+            setSelectedIssues([]);
+            fetchData();
+        } catch (error) {
+            console.error('Error in bulk delete:', error);
+            const msg = error.response?.data?.message || error.message || 'Bulk delete failed';
+            alert(`Error: ${msg}`);
+        }
+    };
+
+    const handleCleanupResolved = async () => {
+        const count = complaints.filter(c => ['resolved', 'closed'].includes(c.status?.toLowerCase())).length;
+
+        if (count === 0) {
+            alert('No resolved or closed issues to clean up.');
+            return;
+        }
+
+        if (!window.confirm(`Clean up all ${count} resolved and closed issues permanently?`)) return;
+
+        try {
+            const { data } = await authAPI.cleanupComplaints();
+            setComplaints(prev => prev.filter(c => !['resolved', 'closed', 'merged'].includes(c.status?.toLowerCase())));
+            alert(data.message || 'Cleanup successful');
+            fetchData();
+        } catch (error) {
+            console.error('Error in cleanup:', error);
+            const msg = error.response?.data?.message || error.message || 'Cleanup failed';
+            alert(`Error: ${msg}`);
+        }
+    };
+
     const handleUpvote = async (id, type) => {
         try {
             if (type === 'announcement') {
@@ -573,213 +624,246 @@ const ManagementDashboard = () => {
                 <div className="tab-content">
                     {(activeTab === 'issues' || activeTab === 'resolved') && (
                         <div className="management-issues-list">
-                            {selectedIssues.length > 0 && (
-                                <div className="bulk-actions-toolbar">
-                                    <span>{selectedIssues.length} issues selected</span>
-                                    <div className="toolbar-btns">
+                            {(activeTab === 'issues' || activeTab === 'resolved') && (
+                                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                                    {selectedIssues.length > 0 && (
+                                        <div className="bulk-actions-toolbar" style={{ margin: 0, flex: 1 }}>
+                                            <span>{selectedIssues.length} issues selected</span>
+                                            <div className="toolbar-btns">
+                                                <button
+                                                    className="merge-action-btn"
+                                                    onClick={() => setShowMergeModal(true)}
+                                                    disabled={selectedIssues.length < 2}
+                                                >
+                                                    🔗 Merge
+                                                </button>
+                                                <button
+                                                    className="delete-selected-btn"
+                                                    onClick={() => handleBulkDelete(selectedIssues)}
+                                                    style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.85rem' }}
+                                                >
+                                                    🗑️ Delete Selected
+                                                </button>
+                                                <button
+                                                    className="clear-selection-btn"
+                                                    onClick={() => setSelectedIssues([])}
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(user?.isAdmin || user?.managementRole === 'subadmin') && (
                                         <button
-                                            className="merge-action-btn"
-                                            onClick={() => setShowMergeModal(true)}
-                                            disabled={selectedIssues.length < 2}
+                                            className="cleanup-btn"
+                                            onClick={handleCleanupResolved}
+                                            style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.6rem 1.2rem', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '500', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                         >
-                                            🔗 Merge Duplicates
+                                            🧹 Cleanup Resolved/Closed
                                         </button>
-                                        <button
-                                            className="clear-selection-btn"
-                                            onClick={() => setSelectedIssues([])}
-                                        >
-                                            Clear
-                                        </button>
-                                    </div>
+                                    )}
                                 </div>
                             )}
 
                             {loading ? <p>Loading...</p> : complaints.length === 0 ? (
                                 <p className="no-pending">No complaints reported yet.</p>
                             ) : (
-                                complaints.map(complaint => (
-                                    <div
-                                        key={complaint._id}
-                                        className={`complaint-card management-card ${['resolved', 'closed'].includes(complaint.status) ? 'strikethrough-resolved' : ''} ${selectedIssues.includes(complaint._id) ? 'selected' : ''}`}
-                                    >
-                                        <div className="card-header">
-                                            <div className="header-meta">
-                                                {activeTab === 'issues' && !['resolved', 'closed', 'merged'].includes(complaint.status) && (
+                                <div className="issues-grid">
+                                    {complaints.map(complaint => (
+                                        <div
+                                            key={complaint._id}
+                                            className={`complaint-card management-card ${['resolved', 'closed', 'merged'].includes(complaint.status?.toLowerCase()) ? 'strikethrough-resolved' : ''} ${selectedIssues.includes(complaint._id) ? 'selected' : ''}`}
+                                        >
+                                            <div className="issue-selection-checkbox">
+                                                {(activeTab === 'issues' || activeTab === 'resolved') && (
                                                     <input
                                                         type="checkbox"
-                                                        className="issue-checkbox"
                                                         checked={selectedIssues.includes(complaint._id)}
                                                         onChange={() => toggleIssueSelection(complaint._id)}
+                                                        aria-label="Select issue"
                                                     />
                                                 )}
-                                                <span className={`priority-badge ${complaint.priority}`}>
-                                                    {complaint.priority}
-                                                </span>
-                                                <span className={`status-badge ${complaint.status}`}>
-                                                    {complaint.status}
-                                                </span>
                                             </div>
-                                            <div className="location-tag">
-                                                {complaint.hostel} • {complaint.block}-{complaint.roomNumber}
+                                            <div className="card-header">
+                                                <div className="header-meta">
+                                                    <span className={`priority-badge ${complaint.priority}`}>
+                                                        {complaint.priority}
+                                                    </span>
+                                                    <span className={`status-badge ${complaint.status}`}>
+                                                        {complaint.status}
+                                                    </span>
+                                                </div>
+                                                <div className="location-tag">
+                                                    {complaint.hostel} • {complaint.block}-{complaint.roomNumber}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className="complaint-body">
-                                            <h3>{complaint.category}</h3>
-                                            <p className="reporter">By: {complaint.student?.email}</p>
-                                            <p className="description">{complaint.description}</p>
+                                            <div className="complaint-body">
+                                                <h3>{complaint.category}</h3>
+                                                <p className="reporter">By: {complaint.student?.email}</p>
+                                                <p className="description">{complaint.description}</p>
 
-                                            {complaint.isPublic && (
-                                                <div className="social-actions" style={{ marginBottom: '1rem' }}>
+                                                {complaint.isPublic && (
+                                                    <div className="social-actions" style={{ marginBottom: '1rem' }}>
+                                                        <button
+                                                            className={`social-btn ${complaint.upvotes?.includes(user?._id) ? 'active' : ''}`}
+                                                            onClick={() => handleUpvote(complaint._id, 'complaint')}
+                                                        >
+                                                            👍 {complaint.upvotes?.length || 0}
+                                                        </button>
+                                                        <button
+                                                            className="social-btn"
+                                                            onClick={() => setSelectedItem(selectedItem?.id === complaint._id ? null : { id: complaint._id, type: 'Complaint' })}
+                                                        >
+                                                            💬 {selectedItem?.id === complaint._id ? 'Close Discussion' : 'Join Discussion'}
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {selectedItem?.id === complaint._id && (
+                                                    <div className="nested-comments-area" style={{ marginBottom: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                                                        <CommentSection entityId={complaint._id} entityType="Complaint" currentUser={{ id: user?._id }} />
+                                                    </div>
+                                                )}
+
+                                                {complaint.caretaker && (
+                                                    <div className="caretaker-info">
+                                                        👷 Caretaker: <strong>{complaint.caretaker}</strong>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="complaint-actions">
+                                                {user?.managementRole === 'caretaker' && complaint.status === 'reported' ? (
                                                     <button
-                                                        className={`social-btn ${complaint.upvotes?.includes(user?._id) ? 'active' : ''}`}
-                                                        onClick={() => handleUpvote(complaint._id, 'complaint')}
+                                                        className="action-btn accept-btn"
+                                                        onClick={() => handleAcceptIssue(complaint._id)}
                                                     >
-                                                        👍 {complaint.upvotes?.length || 0}
+                                                        Accept Issue
                                                     </button>
-                                                    <button
-                                                        className="social-btn"
-                                                        onClick={() => setSelectedItem(selectedItem?.id === complaint._id ? null : { id: complaint._id, type: 'Complaint' })}
-                                                    >
-                                                        💬 {selectedItem?.id === complaint._id ? 'Close Discussion' : 'Join Discussion'}
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {selectedItem?.id === complaint._id && (
-                                                <div className="nested-comments-area" style={{ marginBottom: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
-                                                    <CommentSection entityId={complaint._id} entityType="Complaint" currentUser={{ id: user?._id }} />
-                                                </div>
-                                            )}
-
-                                            {complaint.caretaker && (
-                                                <div className="caretaker-info">
-                                                    👷 Caretaker: <strong>{complaint.caretaker}</strong>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="complaint-actions">
-                                            {user?.managementRole === 'caretaker' && complaint.status === 'reported' ? (
-                                                <button
-                                                    className="action-btn accept-btn"
-                                                    onClick={() => handleAcceptIssue(complaint._id)}
-                                                >
-                                                    Accept Issue
-                                                </button>
-                                            ) : (
-                                                <>
-                                                    {actionId === complaint._id ? (
-                                                        <form onSubmit={handleActionSubmit} className="action-inline-form">
-                                                            {actionType === 'assign' && (
-                                                                <select
-                                                                    value={actionId2}
-                                                                    onChange={(e) => {
-                                                                        const selectedId = e.target.value;
-                                                                        const staffMember = staff.find(s => s._id === selectedId);
-                                                                        setActionValue(staffMember?.email || '');
-                                                                        setActionId2(selectedId);
-                                                                    }}
-                                                                    required
-                                                                >
-                                                                    <option value="">Select Caretaker</option>
-                                                                    {/* Group caretakers by specialization */}
-                                                                    <optgroup label="Recommended specialists">
-                                                                        {staff.filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() === complaint.category?.toLowerCase()).length > 0 ? (
-                                                                            staff
-                                                                                .filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() === complaint.category?.toLowerCase())
+                                                ) : (
+                                                    <>
+                                                        {actionId === complaint._id ? (
+                                                            <form onSubmit={handleActionSubmit} className="action-inline-form">
+                                                                {actionType === 'assign' && (
+                                                                    <select
+                                                                        value={actionId2}
+                                                                        onChange={(e) => {
+                                                                            const selectedId = e.target.value;
+                                                                            const staffMember = staff.find(s => s._id === selectedId);
+                                                                            setActionValue(staffMember?.email || '');
+                                                                            setActionId2(selectedId);
+                                                                        }}
+                                                                        required
+                                                                    >
+                                                                        <option value="">Select Caretaker</option>
+                                                                        {/* Group caretakers by specialization */}
+                                                                        <optgroup label="Recommended specialists">
+                                                                            {staff.filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() === complaint.category?.toLowerCase()).length > 0 ? (
+                                                                                staff
+                                                                                    .filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() === complaint.category?.toLowerCase())
+                                                                                    .map(s => (
+                                                                                        <option key={s._id} value={s._id}>
+                                                                                            {s.email} (Specialist)
+                                                                                        </option>
+                                                                                    ))
+                                                                            ) : (
+                                                                                <option disabled>No exact specialists found</option>
+                                                                            )}
+                                                                        </optgroup>
+                                                                        <optgroup label="Other Staff">
+                                                                            {staff
+                                                                                .filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() !== complaint.category?.toLowerCase())
                                                                                 .map(s => (
                                                                                     <option key={s._id} value={s._id}>
-                                                                                        {s.email} (Specialist)
+                                                                                        {s.email} ({s.staffSpecialization || 'General'})
                                                                                     </option>
-                                                                                ))
-                                                                        ) : (
-                                                                            <option disabled>No exact specialists found</option>
-                                                                        )}
-                                                                    </optgroup>
-                                                                    <optgroup label="Other Staff">
-                                                                        {staff
-                                                                            .filter(s => s.managementRole?.toLowerCase() === 'caretaker' && s.staffSpecialization?.toLowerCase() !== complaint.category?.toLowerCase())
-                                                                            .map(s => (
-                                                                                <option key={s._id} value={s._id}>
-                                                                                    {s.email} ({s.staffSpecialization || 'General'})
-                                                                                </option>
-                                                                            ))}
-                                                                    </optgroup>
-                                                                    {staff.length === 0 && <option disabled>Waiting for staff list...</option>}
-                                                                </select>
-                                                            )}
-                                                            {actionType === 'status' && (
-                                                                <select
-                                                                    value={actionValue}
-                                                                    onChange={(e) => setActionValue(e.target.value)}
-                                                                    required
+                                                                                ))}
+                                                                        </optgroup>
+                                                                        {staff.length === 0 && <option disabled>Waiting for staff list...</option>}
+                                                                    </select>
+                                                                )}
+                                                                {actionType === 'status' && (
+                                                                    <select
+                                                                        value={actionValue}
+                                                                        onChange={(e) => setActionValue(e.target.value)}
+                                                                        required
+                                                                    >
+                                                                        <option value="">Update Status</option>
+                                                                        <option value="in-progress">In Progress</option>
+                                                                        <option value="resolved">Resolved</option>
+                                                                        <option value="closed">Closed</option>
+                                                                        <option value="reported">Re-open (Reported)</option>
+                                                                    </select>
+                                                                )}
+                                                                {actionType === 'priority' && (
+                                                                    <select
+                                                                        value={actionValue}
+                                                                        onChange={(e) => setActionValue(e.target.value)}
+                                                                        required
+                                                                    >
+                                                                        <option value="">Update Priority</option>
+                                                                        <option value="low">Low</option>
+                                                                        <option value="medium">Medium</option>
+                                                                        <option value="high">High</option>
+                                                                        <option value="emergency">Emergency</option>
+                                                                    </select>
+                                                                )}
+                                                                <textarea
+                                                                    placeholder="Optional remarks..."
+                                                                    value={actionComment}
+                                                                    onChange={(e) => setActionComment(e.target.value)}
+                                                                />
+                                                                <div className="inline-btns">
+                                                                    <button type="submit" className="save-btn">Save</button>
+                                                                    <button type="button" onClick={() => setActionId(null)} className="cancel-btn">Cancel</button>
+                                                                </div>
+                                                            </form>
+                                                        ) : (
+                                                            <div className="action-btns">
+                                                                {/* Caretakers cannot re-assign or change priority */}
+                                                                {user?.managementRole !== 'caretaker' && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => { setActionId(complaint._id); setActionType('assign'); }}
+                                                                            className="action-btn assign"
+                                                                            disabled={['resolved', 'closed'].includes(complaint.status)}
+                                                                        >
+                                                                            Assign
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => { setActionId(complaint._id); setActionType('priority'); }}
+                                                                            className="action-btn priority-btn"
+                                                                            disabled={['resolved', 'closed'].includes(complaint.status)}
+                                                                        >
+                                                                            Priority
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => { setActionId(complaint._id); setActionType('status'); }}
+                                                                    className="action-btn status-btn"
+                                                                    disabled={['resolved', 'closed'].includes(complaint.status)}
                                                                 >
-                                                                    <option value="">Update Status</option>
-                                                                    <option value="in-progress">In Progress</option>
-                                                                    <option value="resolved">Resolved</option>
-                                                                    <option value="closed">Closed</option>
-                                                                    <option value="reported">Re-open (Reported)</option>
-                                                                </select>
-                                                            )}
-                                                            {actionType === 'priority' && (
-                                                                <select
-                                                                    value={actionValue}
-                                                                    onChange={(e) => setActionValue(e.target.value)}
-                                                                    required
-                                                                >
-                                                                    <option value="">Update Priority</option>
-                                                                    <option value="low">Low</option>
-                                                                    <option value="medium">Medium</option>
-                                                                    <option value="high">High</option>
-                                                                    <option value="emergency">Emergency</option>
-                                                                </select>
-                                                            )}
-                                                            <textarea
-                                                                placeholder="Optional remarks..."
-                                                                value={actionComment}
-                                                                onChange={(e) => setActionComment(e.target.value)}
-                                                            />
-                                                            <div className="inline-btns">
-                                                                <button type="submit" className="save-btn">Save</button>
-                                                                <button type="button" onClick={() => setActionId(null)} className="cancel-btn">Cancel</button>
+                                                                    Status
+                                                                </button>
+                                                                {(user?.isAdmin || user?.managementRole === 'subadmin') && ['resolved', 'closed'].includes(complaint.status) && (
+                                                                    <button
+                                                                        onClick={() => handleDeleteComplaint(complaint._id)}
+                                                                        className="action-btn delete-btn"
+                                                                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                                                    >
+                                                                        🗑️ Delete
+                                                                    </button>
+                                                                )}
                                                             </div>
-                                                        </form>
-                                                    ) : (
-                                                        <div className="action-btns">
-                                                            {/* Caretakers cannot re-assign or change priority */}
-                                                            {user?.managementRole !== 'caretaker' && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => { setActionId(complaint._id); setActionType('assign'); }}
-                                                                        className="action-btn assign"
-                                                                        disabled={['resolved', 'closed'].includes(complaint.status)}
-                                                                    >
-                                                                        Assign
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => { setActionId(complaint._id); setActionType('priority'); }}
-                                                                        className="action-btn priority-btn"
-                                                                        disabled={['resolved', 'closed'].includes(complaint.status)}
-                                                                    >
-                                                                        Priority
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                            <button
-                                                                onClick={() => { setActionId(complaint._id); setActionType('status'); }}
-                                                                className="action-btn status-btn"
-                                                                disabled={['resolved', 'closed'].includes(complaint.status)}
-                                                            >
-                                                                Status
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
                         </div>
                     )}
@@ -1250,7 +1334,7 @@ const ManagementDashboard = () => {
                                                 {!item.isApproved ? (
                                                     <div className="moderation-panel" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                                                         <button onClick={() => handleModerateLF(item._id, 'approve_post')} className="approve-btn" style={{ flex: 1 }}>Approve Post</button>
-                                                        <button onClick={() => handleModerateLF(item._id, 'reject_post')} className="cancel-btn" style={{ flex: 1 }}>Reject & Delete</button>
+                                                        <button onClick={() => handleModerateLF(item._id, 'reject_post')} className="reject-btn" style={{ flex: 1 }}>Reject Post</button>
                                                     </div>
                                                 ) : (item.status === 'claimed' || item.isResolutionRequested) ? (
                                                     <div className="moderation-panel" style={{ marginTop: '1rem', padding: '1rem', background: item.isResolutionRequested ? 'rgba(52, 211, 153, 0.05)' : 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', border: `1px solid ${item.isResolutionRequested ? 'rgba(52, 211, 153, 0.2)' : 'rgba(99, 102, 241, 0.2)'}` }}>
@@ -1262,7 +1346,7 @@ const ManagementDashboard = () => {
                                                         </p>
                                                         <div className="inline-btns" style={{ display: 'flex', gap: '0.5rem' }}>
                                                             <button onClick={() => handleModerateLF(item._id, 'approve_claim')} className="approve-btn" style={{ flex: 1 }}>Accept & Resolve</button>
-                                                            <button onClick={() => handleModerateLF(item._id, 'reject_claim')} className="cancel-btn" style={{ flex: 1 }}>Reject & Open</button>
+                                                            <button onClick={() => handleModerateLF(item._id, 'reject_claim')} className="reject-btn" style={{ flex: 1 }}>Reject Claim</button>
                                                         </div>
                                                     </div>
                                                 ) : null}

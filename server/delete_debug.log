@@ -1,0 +1,21 @@
+[2026-01-30T10:55:02.050Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:55:06.391Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:55:09.160Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:57:06.491Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:57:09.063Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:57:54.954Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:58:43.537Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:58:57.045Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T10:59:07.958Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T11:01:30.700Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T11:01:37.226Z] DELETE ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T11:01:44.381Z] DELETE ID: 697b9c78842ec0f13f410b52, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T11:13:40.469Z] DELETE ID: 697b9c78842ec0f13f410b52, User: harishkumarkg2247@gmail.com, Role: management
+[2026-01-30T11:18:21.579Z] DELETE ATTEMPT - ID: 697b9c78842ec0f13f410b52, User: harishkumarkg2247@gmail.com, Role: management
+SUCCESS: Found and deleted document 697b9c78842ec0f13f410b52
+[2026-01-30T11:41:53.496Z] DELETE ATTEMPT - ID: 697b9414842ec0f13f410a07, User: harishkumarkg2247@gmail.com, Role: management
+SUCCESS: Found and deleted document 697b9414842ec0f13f410a07
+[2026-01-30T11:41:55.745Z] DELETE ATTEMPT - ID: 697b92a5ed24b75207e42c05, User: harishkumarkg2247@gmail.com, Role: management
+SUCCESS: Found and deleted document 697b92a5ed24b75207e42c05
+[2026-01-30T11:41:58.146Z] DELETE ATTEMPT - ID: 697b91bbed24b75207e42b85, User: harishkumarkg2247@gmail.com, Role: management
+SUCCESS: Found and deleted document 697b91bbed24b75207e42b85

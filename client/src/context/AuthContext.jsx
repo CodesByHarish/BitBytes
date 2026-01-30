@@ -21,8 +21,9 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 try {
                     const { data } = await authAPI.getMe();
-                    setUser(data);
-                    localStorage.setItem('user', JSON.stringify(data));
+                    const normalized = { ...data, _id: data._id || data.id, id: data.id || data._id };
+                    setUser(normalized);
+                    localStorage.setItem('user', JSON.stringify(normalized));
                 } catch (error) {
                     console.error('Session verify failed:', error);
                     localStorage.removeItem('user');
@@ -38,17 +39,19 @@ export const AuthProvider = ({ children }) => {
 
     const loginStudent = async (email, password) => {
         const { data } = await authAPI.loginStudent({ email, password });
+        const normalized = { ...data.user, _id: data.user._id || data.user.id, id: data.user.id || data.user._id };
         localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(normalized));
+        setUser(normalized);
         return data;
     };
 
     const loginManagement = async (email, password) => {
         const { data } = await authAPI.loginManagement({ email, password });
+        const normalized = { ...data.user, _id: data.user._id || data.user.id, id: data.user.id || data.user._id };
         localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(normalized));
+        setUser(normalized);
         return data;
     };
 

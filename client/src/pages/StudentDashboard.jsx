@@ -38,11 +38,16 @@ const StudentDashboard = () => {
     });
 
     useEffect(() => {
-        fetchMyComplaints();
-        fetchAnnouncements();
-        fetchLostFoundItems();
-        fetchPublicComplaints();
-    }, []);
+        const fetchData = async () => {
+            await Promise.all([
+                fetchMyComplaints(),
+                fetchAnnouncements(),
+                fetchLostFoundItems(),
+                fetchPublicComplaints()
+            ]);
+        };
+        fetchData();
+    }, [activeSection]);
 
     const fetchLostFoundItems = async () => {
         try {
@@ -63,7 +68,12 @@ const StudentDashboard = () => {
     };
 
     const fetchMyComplaints = async () => {
-        // ... (rest of implementation) ...
+        try {
+            const { data } = await authAPI.getMyComplaints();
+            setComplaints(data);
+        } catch (error) {
+            console.error('Error fetching my complaints:', error);
+        }
     };
 
     const handleLfSubmit = async (e) => {
@@ -105,7 +115,11 @@ const StudentDashboard = () => {
         try {
             await authAPI.claimItem(item._id);
             alert('Claimed! You can now participate in the discussion to coordinate.');
-            fetchLostFoundItems();
+
+            // Wait for the fresh data to load
+            await fetchLostFoundItems();
+
+            // Now open the discussion
             setSelectedItem({ id: item._id, type: 'LostFound' });
         } catch (error) {
             console.error('Error claiming item:', error);
@@ -149,6 +163,7 @@ const StudentDashboard = () => {
                 isPublic: false
             });
             fetchMyComplaints();
+            fetchPublicComplaints();
             setActiveSection('my-issues');
         } catch (error) {
             console.error('Error raising complaint:', error);
@@ -276,8 +291,10 @@ const StudentDashboard = () => {
                 </div>
                 <h3>Community Feed</h3>
                 <p>Discuss public issues & announcements</p>
-                {publicComplaints.length > 0 && (
-                    <span className="nav-box-badge" style={{ background: '#3b82f6' }}>{publicComplaints.length}</span>
+                {publicComplaints.filter(item => !['resolved', 'closed', 'merged'].includes(item.status?.toLowerCase())).length > 0 && (
+                    <span className="nav-box-badge" style={{ background: '#3b82f6' }}>
+                        {publicComplaints.filter(item => !['resolved', 'closed', 'merged'].includes(item.status?.toLowerCase())).length}
+                    </span>
                 )}
             </div>
 
@@ -890,13 +907,15 @@ const StudentDashboard = () => {
             </div>
 
             <div className="detail-content">
-                {loading ? <p>Loading feed...</p> : publicComplaints.length === 0 ? (
+                {loading ? (
+                    <p>Loading feed...</p>
+                ) : publicComplaints.filter(item => !['resolved', 'closed'].includes(item.status)).length === 0 ? (
                     <div className="empty-state">
-                        <p>No public discussions yet.</p>
+                        <p>No active public discussions.</p>
                     </div>
                 ) : (
                     <div className="complaints-list">
-                        {publicComplaints.map(item => (
+                        {publicComplaints.filter(item => !['resolved', 'closed'].includes(item.status)).map(item => (
                             <div key={item._id} className="complaint-card community-card" style={{ borderLeft: '4px solid #3b82f6' }}>
                                 <div className="card-header">
                                     <span className={`priority-badge ${item.priority}`}>

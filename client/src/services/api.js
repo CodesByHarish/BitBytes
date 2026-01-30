@@ -14,22 +14,39 @@ const api = axios.create({
 // Add access token to requests
 api.interceptors.request.use(
     (config) => {
+        console.log(`[API REQUEST] ${config.method.toUpperCase()} ${config.url}`, config.data || '');
         const token = localStorage.getItem('accessToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
-    (error) => Promise.reject(error)
+    (error) => {
+        console.error('[API REQUEST ERROR]', error);
+        return Promise.reject(error);
+    }
 );
 
 // Handle token refresh on 401
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        console.log(`[API SUCCESS] ${response.config.method.toUpperCase()} ${response.config.url}`, response.data);
+        return response;
+    },
     async (error) => {
+        console.error(`[API ERROR] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message
+        });
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Skip refresh logic for login and signup routes
+        const isAuthRoute = originalRequest.url.includes('/auth/login') ||
+            originalRequest.url.includes('/auth/signup') ||
+            originalRequest.url.includes('/auth/refresh-token');
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
             originalRequest._retry = true;
 
             try {
@@ -74,6 +91,9 @@ export const authAPI = {
     updateComplaintStatus: (id, status, comment) => api.put(`/complaints/${id}/status`, { status, comment }),
     updateComplaintPriority: (id, priority, comment) => api.put(`/complaints/${id}/priority`, { priority, comment }),
     mergeComplaints: (primaryId, duplicateIds) => api.post('/complaints/merge', { primaryId, duplicateIds }),
+    deleteComplaint: (id) => api.delete(`/complaints/${id}`),
+    bulkDeleteComplaints: (ids) => api.post('/complaints/delete-bulk', { ids }),
+    cleanupComplaints: () => api.post('/complaints/cleanup'),
 
     // Announcement endpoints
     getAnnouncements: () => api.get('/announcements'),

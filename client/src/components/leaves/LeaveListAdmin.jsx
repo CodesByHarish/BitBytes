@@ -22,6 +22,7 @@ const LeaveListAdmin = () => {
             if (filterBlock) params.block = filterBlock;
 
             const { data } = await authAPI.getAllLeaves(params);
+            console.log('[DEBUG] Fetched Leaves Count:', data.length);
             setLeaves(data);
         } catch (error) {
             console.error('Error fetching leaves:', error);
@@ -49,10 +50,24 @@ const LeaveListAdmin = () => {
         if (!window.confirm('Are you sure you want to PERMANENTLY delete this request? This action cannot be undone.')) return;
         try {
             await authAPI.deleteLeave(id);
+            alert('Request deleted successfully from database!');
+
+            // Optimistic sync: Remove from local state immediately
+            setLeaves(prev => {
+                const newList = prev.filter(req => req._id !== id);
+                console.log(`[DEBUG] UI Sync: Removed ${id}. New count: ${newList.length}`);
+                return newList;
+            });
+
+            // Re-fetch to ensure sync with database
             fetchLeaves();
         } catch (error) {
-            console.error('Error deleting leave:', error);
-            alert('Failed to delete request');
+            console.error('Delete Failure Context:', error);
+            const serverMsg = error.response?.data?.message;
+            const status = error.response?.status;
+            const fallback = error.message || 'Connection failed';
+
+            alert(`Error ${status || ''}: ${serverMsg || fallback}`);
         }
     };
 
@@ -77,6 +92,19 @@ const LeaveListAdmin = () => {
                 </select>
 
                 <button onClick={fetchLeaves} style={{ padding: '8px', cursor: 'pointer' }}>Refresh</button>
+                <button
+                    onClick={async () => {
+                        try {
+                            const { data } = await authAPI.getMe();
+                            alert(`Connection OK! Logged in as: ${data.email}`);
+                        } catch (e) {
+                            alert(`Connection FAILED: ${e.message}`);
+                        }
+                    }}
+                    style={{ padding: '8px', cursor: 'pointer', background: '#2196F3', color: 'white', border: 'none', borderRadius: '4px' }}
+                >
+                    Test Connection
+                </button>
             </div>
 
             <div className="leave-list-container">

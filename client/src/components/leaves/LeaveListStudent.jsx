@@ -34,6 +34,26 @@ const LeaveListStudent = ({ refreshTrigger }) => {
         }
     };
 
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to PERMANENTLY delete this request? This action cannot be undone.')) return;
+        try {
+            await authAPI.deleteLeave(id);
+            alert('Request deleted successfully!');
+
+            // Optimistic update
+            setLeaves(prev => prev.filter(req => req._id !== id));
+
+            fetchLeaves();
+        } catch (error) {
+            console.error('Delete Failure Context:', error);
+            const serverMsg = error.response?.data?.message;
+            const status = error.response?.status;
+            const fallback = error.message || 'Connection failed';
+
+            alert(`Error ${status || ''}: ${serverMsg || fallback}`);
+        }
+    };
+
     if (loading) return <div>Loading requests...</div>;
 
     return (
@@ -63,7 +83,18 @@ const LeaveListStudent = ({ refreshTrigger }) => {
 
                         <div className="leave-actions">
                             {(request.status === 'submitted' || request.status === 'draft') && (
-                                <button className="delete-card-btn" onClick={() => handleCancel(request._id)} title="Cancel Request">
+                                <button className="delete-btn" onClick={() => handleCancel(request._id)} title="Cancel Request">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                </button>
+                            )}
+
+                            {(request.status === 'rejected' || request.status === 'cancelled') && (
+                                <button className="delete-btn" onClick={() => handleDelete(request._id)} title="Delete Request from History">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="3 6 5 6 21 6"></polyline>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>

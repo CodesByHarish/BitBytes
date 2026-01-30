@@ -578,6 +578,23 @@
     box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
 }
 
+.reject-btn {
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reject-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
+}
+
 .no-pending {
     text-align: center;
     color: #6b7280;
@@ -2125,6 +2142,24 @@ select:focus {
     transform: scale(1.1);
 }
 
+/* Leaves & Outpass Box */
+.leaves-box::before {
+    background: linear-gradient(90deg, #ec4899, #ef4444);
+}
+
+.leaves-box .nav-box-icon {
+    background: rgba(236, 72, 153, 0.1);
+}
+
+.leaves-box .nav-box-icon svg {
+    color: #f472b6;
+}
+
+.leaves-box:hover .nav-box-icon {
+    background: rgba(236, 72, 153, 0.2);
+    transform: scale(1.1);
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -2277,6 +2312,26 @@ select:focus {
     transform: translateY(-1px);
 }
 
+.reject-btn {
+    background: #ef4444 !important;
+    color: white !important;
+    border: none !important;
+    padding: 0 1.5rem !important;
+    height: 40px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reject-btn:hover {
+    background: #dc2626 !important;
+    transform: translateY(-1px);
+}
+
 .staff-list {
     display: flex;
     flex-direction: column;
@@ -2363,12 +2418,9 @@ select:focus {
 
 .management-card.strikethrough-resolved h3,
 .management-card.strikethrough-resolved .description,
-.management-card.strikethrough-resolved .action-btn {
+.management-card.strikethrough-resolved .action-btn:not(.delete-btn) {
     text-decoration: line-through;
     color: #9ca3af;
-}
-
-.management-card.strikethrough-resolved .action-btn {
     pointer-events: none;
     opacity: 0.5;
     background: rgba(255, 255, 255, 0.05) !important;
@@ -2402,6 +2454,11 @@ select:focus {
 .action-btn.accept-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    transform: translateY(-2px);
 }
 
 .admin-tag.subadmin {

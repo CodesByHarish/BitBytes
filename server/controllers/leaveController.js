@@ -148,21 +148,47 @@ const cancelLeaveRequest = async (req, res) => {
 // @desc    Delete request (Management)
 // @route   DELETE /api/leaves/:id
 // @access  Private (Management)
+const fs = require('fs');
+const path = require('path');
+
 const deleteLeaveRequest = async (req, res) => {
     try {
-        if (req.user.role !== 'management') {
-            return res.status(403).json({ message: 'Not authorized' });
-        }
+        const { id } = req.params;
+        const logMsg = `[${new Date().toISOString()}] DELETE ATTEMPT - ID: ${id}, User: ${req.user.email}, Role: ${req.user.role}\n`;
+        fs.appendFileSync(path.join(__dirname, '../delete_debug.log'), logMsg);
 
-        const request = await LeaveRequest.findById(req.params.id);
+        const request = await LeaveRequest.findById(id);
 
         if (!request) {
             return res.status(404).json({ message: 'Request not found' });
         }
 
-        await request.deleteOne();
+        const currentUserId = req.user._id ? req.user._id.toString() : req.user.id;
+        const requestOwnerId = request.student.toString();
+        const isOwner = requestOwnerId === currentUserId;
+        const isManagement = req.user.role === 'management' || req.user.isAdmin === true;
+        const canStudentDelete = isOwner && ['rejected', 'cancelled', 'draft'].includes(request.status);
+
+        if (!isManagement && !canStudentDelete) {
+            const whyText = isOwner ? `You cannot delete a ${request.status} request. Only rejected or cancelled ones can be removed.` : 'Not authorized to delete this request';
+            return res.status(403).json({ message: whyText });
+        }
+
+        const deleted = await LeaveRequest.findByIdAndDelete(id);
+
+        const resultLog = deleted ?
+            `SUCCESS: Found and deleted document ${id}\n` :
+            `FAILED: Document ${id} was not found in database during deletion\n`;
+
+        fs.appendFileSync(path.join(__dirname, '../delete_debug.log'), resultLog);
+
+        if (!deleted) {
+            return res.status(404).json({ message: 'Request could not be deleted. It might have already been removed.' });
+        }
+
         res.json({ message: 'Request deleted successfully' });
     } catch (error) {
+        fs.appendFileSync(path.join(__dirname, '../delete_debug.log'), `ERROR: ${error.message}\n`);
         res.status(500).json({ message: error.message });
     }
 };

@@ -15,8 +15,8 @@ router.get('/', protect, async (req, res) => {
         }
 
         const items = await LostFound.find(query)
-            .populate('reportedBy', 'email')
-            .populate('claimant', 'email')
+            .populate('reportedBy', '_id email')
+            .populate('claimant', '_id email')
             .sort({ createdAt: -1 });
         res.json(items);
     } catch (error) {

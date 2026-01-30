@@ -3,6 +3,72 @@ const router = express.Router();
 const Complaint = require('../models/Complaint');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
+// @desc    Cleanup all resolved/closed complaints
+// @route   POST /api/complaints/cleanup
+router.post('/cleanup', protect, authorize('management'), async (req, res) => {
+    try {
+        console.log(`Cleanup triggered by: ${req.user.email}`);
+        const result = await Complaint.deleteMany({
+            status: { $in: ['resolved', 'closed', 'merged'] }
+        });
+        res.json({ message: `Successfully cleaned up ${result.deletedCount} issues` });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Bulk delete complaints
+// @route   POST /api/complaints/delete-bulk
+router.post('/delete-bulk', protect, authorize('management'), async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !ids.length) {
+            return res.status(400).json({ message: 'No IDs provided' });
+        }
+
+        console.log(`Bulk deleting ${ids.length} complaints by: ${req.user.email}`);
+
+        // Also cleanup merged issues for each being deleted
+        const complaints = await Complaint.find({ _id: { $in: ids } });
+        const allIdsToDelete = [...ids];
+        complaints.forEach(c => {
+            if (c.mergedIssues && c.mergedIssues.length > 0) {
+                allIdsToDelete.push(...c.mergedIssues.map(m => m.toString()));
+            }
+        });
+
+        const uniqueIds = [...new Set(allIdsToDelete)];
+        await Complaint.deleteMany({ _id: { $in: uniqueIds } });
+
+        res.json({ message: 'Complaints deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Delete a complaint
+// @route   DELETE /api/complaints/:id
+router.delete('/:id', protect, authorize('management'), async (req, res) => {
+    try {
+        console.log(`Deleting complaint: ${req.params.id} by: ${req.user.email}`);
+        const complaint = await Complaint.findById(req.params.id);
+        if (!complaint) {
+            return res.status(404).json({ message: 'Complaint not found' });
+        }
+
+        // Cleanup merged issues
+        if (complaint.mergedIssues && complaint.mergedIssues.length > 0) {
+            await Complaint.deleteMany({ _id: { $in: complaint.mergedIssues } });
+        }
+
+        await Complaint.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Complaint deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+
 // @desc    Raise a new complaint
 // @route   POST /api/complaints
 router.post('/', protect, async (req, res) => {
@@ -272,5 +338,7 @@ router.post('/:id/upvote', protect, async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+
 
 module.exports = router;
