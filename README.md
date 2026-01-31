@@ -77,7 +77,7 @@ JWT_SECRET=your_jwt_secret
 
 ```
 ---
-** Demo Credentials (For Testing Only)**
+## Demo Credentials (For Testing Only)
 
 - Student: harishkkg22@gmail.com / harish@123
 
@@ -102,6 +102,7 @@ JWT_SECRET=your_jwt_secret
 
 **Harish**  
 GitHub: https://github.com/CodesByHarish
+
 
 
 
