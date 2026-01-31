@@ -74,7 +74,10 @@ Create a .env file in the backend folder and add:
 
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
-Demo Credentials (For Testing Only)
+
+```
+ 
+##Demo Credentials (For Testing Only)
 Dummy credentials for demo purposes only.
 
 Student: harishkkg22@gmail.com / harish@123
@@ -87,9 +90,10 @@ Sub Admin: rahul220503@gmail.com / rahul@123
 
 Super Admin: harishkumarkg2247@gmail.com / harish@123
 
-Live Demo
+##Live Demo
 https://hosteleazy.netlify.app
 
-Author
+##Author
 Harish
+
 GitHub: https://github.com/CodesByHarish
