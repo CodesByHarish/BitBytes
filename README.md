@@ -77,28 +77,29 @@ JWT_SECRET=your_jwt_secret
 
 ```
  
-**##Demo Credentials (For Testing Only)**
-###Dummy credentials for demo purposes only.
+**## Demo Credentials (For Testing Only)**
 
--Student: harishkkg22@gmail.com / harish@123
+- Student: harishkkg22@gmail.com / harish@123
 
--Student2: tejasmprasanna94@gmaik.com / tejas@123
+- Student2: tejasmprasanna94@gmaik.com / tejas@123
 
--Caretaker: rahul1406@gmail.com / password123
+- Caretaker: rahul1406@gmail.com / password123
 
--Sub Admin: rahul220503@gmail.com / rahul@123
+- Sub Admin: rahul220503@gmail.com / rahul@123
 
--Super Admin: harishkumarkg2247@gmail.com / harish@123
+- Super Admin: harishkumarkg2247@gmail.com / harish@123
 
----
-
-**##Live Demo**
--https://hosteleazy.netlify.app
 
 ---
 
-**##Author**
--Harish
+## Live Demo
 
--GitHub: https://github.com/CodesByHarish
+🔗 https://hosteleazy.netlify.app
+
+---
+
+## Author
+
+**Harish**  
+GitHub: https://github.com/CodesByHarish
 
