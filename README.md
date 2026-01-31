@@ -81,7 +81,7 @@ JWT_SECRET=your_jwt_secret
 
 - Student: harishkkg22@gmail.com / harish@123
 
-- Student2: tejasmprasanna94@gmaik.com / tejas@123
+- Student2: tejasmprasanna94@gmail.com / tejas@123
 
 - Caretaker: rahul1406@gmail.com / password123
 
@@ -89,7 +89,7 @@ JWT_SECRET=your_jwt_secret
 
 - Super Admin: harishkumarkg2247@gmail.com / harish@123
 
-
+ 
 ---
 
 ## Live Demo
@@ -102,6 +102,7 @@ JWT_SECRET=your_jwt_secret
 
 **Harish**  
 GitHub: https://github.com/CodesByHarish
+
 
 
 
